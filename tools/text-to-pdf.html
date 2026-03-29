@@ -164,9 +164,9 @@
 
     /* ── PREVIEW ── */
     .preview-frame {
-      margin-top: 18px;
-      border: 1.5px dashed var(--border-subtle); border-radius: 12px;
-      background: var(--bg-2);
+      margin-top: 18px; height: 640px;
+      border: 1.5px solid var(--border-subtle); border-radius: 12px;
+      overflow: hidden; background: var(--bg-2);
     }
 
     .section-rule { border: none; border-top: 1px solid var(--border-subtle); margin: 18px 0; }
@@ -431,7 +431,11 @@
         </button>
       </div>
       <div id="previewWrapper" style="display:none;">
+        <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: auto;">
+          <p style="color: var(--text-muted); margin-bottom: 16px; font-family: 'DM Sans', sans-serif;">Your document is ready to preview.</p>
+          <a id="previewLinkBtn" href="#" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
         </div>
+      </div>
     </div>
 
     <div class="card">
@@ -654,78 +658,61 @@
       });
     }
 
-    // FIXED: Render strategy
-    // Create an isolated container far off-screen so the browser fully paints it natively. 
-    // This entirely solves the "Blank PDF on Mobile" bug while maintaining exact dimensions.
-    const wrapper = document.createElement('div');
-    wrapper.id = "pdf-temp-wrapper";
-    wrapper.style.cssText = `
-      position: absolute; 
-      top: -9999px; 
-      left: 0; 
-      width: 800px; 
-      z-index: -9999; 
-      background: ${theme.pageBg}; 
-      font-family: ${fontFamily}; 
-      font-size: ${fontSize}; 
-      line-height: ${lineHeight}; 
-      ${theme.bodyExtra}
-    `;
-    
-    // Inject the raw HTML inside the wrapper
-    wrapper.innerHTML = `
+    // ── FIX 1: MOBILE OFF-SCREEN RENDER BUG ──
+    // Mobile browsers flat-out refuse to paint elements placed off-screen (left: -9999px).
+    // We place it at top: 0, left: 0 so the browser MUST paint it. 
+    // We hide it behind the app UI using z-index: -9999 and pointer-events: none.
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `position: absolute; top: 0; left: 0; width: 800px; z-index: -9999; pointer-events: none; background: ${theme.pageBg};`;
+
+    const container = document.createElement('div');
+    container.style.cssText = `font-family:${fontFamily}; font-size:${fontSize}; line-height:${lineHeight}; color:${theme.textColor};`;
+
+    container.innerHTML = `
       ${coverHTML}
-      <div class="ql-editor" style="padding: ${marginMm * 1.5}px;">
+      <div class="ql-editor" style="padding:${marginMm * 1.5}px;">
         ${contentHTML}
       </div>
     `;
 
-    // Append to body temporarily so it's registered in the DOM tree
-    document.body.appendChild(wrapper);
-
-    // FIXED: Safe Color Inheritance Strategy
-    // We traverse the DOM and ONLY apply the default theme color to elements that 
-    // do NOT have an explicit inline style or Quill CSS class.
-    // This replaces the destructive global `!important` block and perfectly preserves custom colors.
-
-    // 1. Check and color headings safely
-    wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
-      const hasQuillColor = Array.from(h.classList).some(c => c.startsWith('ql-color-') || c.startsWith('ql-bg-'));
-      if (!h.style.color && !hasQuillColor) {
-        h.style.color = theme.headColor;
+    // ── FIX 2: DARK MODE INVISIBLE TEXT BUG ──
+    // Because the app is in dark mode, the text is white. White text on a white PDF = invisible.
+    // We explicitly overwrite the style of EVERY element with the correct theme color, 
+    // BUT we skip any element you intentionally colored red/blue/etc inside the Quill Editor.
+    const allNodes = container.querySelectorAll('*');
+    for (let i = 0; i < allNodes.length; i++) {
+      const node = allNodes[i];
+      // Skip if it has an inline color (protects custom Quill text colors)
+      if (node.style && node.style.color) continue; 
+      
+      if (node.tagName.match(/^H[1-6]$/i)) {
+        node.style.color = theme.headColor;
+      } else if (['P', 'SPAN', 'DIV', 'LI', 'A', 'BLOCKQUOTE', 'STRONG', 'EM'].includes(node.tagName)) {
+        node.style.color = theme.textColor;
       }
-    });
+    }
 
-    // 2. Check and color body text elements safely
-    wrapper.querySelectorAll('p, span, div, li, a, blockquote, strong, em').forEach(el => {
-      const hasQuillColor = Array.from(el.classList).some(c => c.startsWith('ql-color-') || c.startsWith('ql-bg-'));
-      if (!el.style.color && !hasQuillColor) {
-        el.style.color = theme.textColor;
-      }
-    });
+    container.querySelectorAll('img').forEach(img => { img.style.maxWidth = '100%'; img.style.height = 'auto'; });
 
-    // 3. Ensure images are bounded safely
-    wrapper.querySelectorAll('img').forEach(img => {
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-    });
+    wrap.appendChild(container);
+    document.body.appendChild(wrap);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
 
+    // Notice we REMOVED the 'avoid-all' setting to stop huge chunks of text from disappearing
     const opt = {
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
       filename:    filename,
       image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
-      // FIXED: Removed 'avoid-all' from pagebreak to prevent massive chunks of text from disappearing
-      pagebreak:   { mode: ['css', 'legacy'] }, 
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg },
+      pagebreak:   { mode: ['css', 'legacy'] },
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
 
-    const cleanup = () => { if (document.body.contains(wrapper)) document.body.removeChild(wrapper); };
+    const cleanup = () => { if (document.body.contains(wrap)) document.body.removeChild(wrap); };
 
-    html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(pdf => {
+    html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
       const pgW   = pdf.internal.pageSize.getWidth();
       const pgH   = pdf.internal.pageSize.getHeight();
@@ -770,24 +757,16 @@
         }
       }
 
-      cleanup(); // Safely clear the offscreen DOM element immediately
-
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
-        const previewWrapper = document.getElementById('previewWrapper');
-        
-        previewWrapper.innerHTML = `
-          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <p style="color: var(--text-muted); margin-bottom: 16px; font-family: 'DM Sans', sans-serif;">Your document is ready to preview.</p>
-            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
-          </div>
-        `;
-        
-        previewWrapper.style.display = 'block';
+        document.getElementById('previewLinkBtn').href = blobUrl;
+        document.getElementById('previewWrapper').style.display = 'block';
+        cleanup();
         btn.disabled  = false;
         btn.innerHTML = origHTML;
       } else {
         pdf.save(filename);
+        cleanup();
         statusEl.className = 'status success fade-in';
         statusEl.innerHTML  = '<div class="status-dot"></div>PDF downloaded successfully!';
         btn.disabled  = false;

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Background Remover — PALMTOOLS</title>
+  <link rel="stylesheet" href="../shared.css"/>
+  <style>
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .img-panel {
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1.5px solid var(--border-subtle);
+      background: var(--surface-2);
+    }
+    .img-panel-label {
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-faint);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: 'Syne', sans-serif;
+    }
+    .img-panel img, .img-panel canvas {
+      width: 100%;
+      display: block;
+    }
+    .img-panel.result-panel {
+      background: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .img-panel.result-panel {
+        background: repeating-conic-gradient(#333 0% 25%, #1a1a1a 0% 50%) 0 0 / 16px 16px;
+      }
+    }
+    .processing-overlay {
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .processing-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .processing-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 280px;
+    }
+    .proc-spinner {
+      width: 40px; height: 40px;
+      border: 4px solid var(--border-subtle);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 500px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="tool-page">
+    <!-- Nav -->
+    <nav class="tool-nav">
+      <a class="back-btn" href="../index.html">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Back to PALMTOOLS
+      </a>
+    </nav>
+
+    <!-- Header -->
+    <header class="tool-header">
+      <div class="tool-icon-badge">✂️</div>
+      <h1 class="tool-title">Background <span class="accent">Remover</span></h1>
+      <p class="tool-subtitle">Remove backgrounds from images using AI — runs entirely in your browser, no data sent to servers.</p>
+    </header>
+
+    <!-- Upload -->
+    <div class="card" id="uploadCard">
+      <div class="card-title">Upload Image</div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])" />
+        <div class="drop-zone-icon">🖼️</div>
+        <h3>Drop image here</h3>
+        <p>or <span class="browse-link">browse</span> · JPG, PNG, WebP supported</p>
+      </div>
+      <div id="statusMsg" style="display:none"></div>
+    </div>
+
+    <!-- Processing / Result -->
+    <div class="card" id="resultCard" style="display:none">
+      <div class="card-title">Result</div>
+
+      <!-- Processing state -->
+      <div id="processingState" class="processing-overlay" style="display:none">
+        <div class="proc-spinner"></div>
+        <div class="processing-title">Removing background…</div>
+        <div class="processing-sub">AI model is loading and processing your image. This may take a moment on first run.</div>
+        <div class="progress-wrap" style="width:100%;max-width:320px">
+          <div class="progress-bar" id="progressBar" style="width:5%"></div>
+        </div>
+        <div id="progressLabel" style="font-size:13px;color:var(--text-faint)">Initializing…</div>
+      </div>
+
+      <!-- Before/After -->
+      <div id="beforeAfter" class="before-after" style="display:none">
+        <div class="img-panel">
+          <div class="img-panel-label">Original</div>
+          <img id="originalImg" src="" alt="Original" />
+        </div>
+        <div class="img-panel result-panel">
+          <div class="img-panel-label">Background removed</div>
+          <img id="resultImg" src="" alt="Result" />
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions" id="resultActions" style="display:none; margin-top:20px">
+        <button class="btn btn-primary" onclick="downloadResult()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PNG
+        </button>
+        <button class="btn btn-secondary" onclick="resetTool()">
+          Try another image
+        </button>
+      </div>
+    </div>
+
+    <!-- Info note -->
+    <div class="card" style="border-style:dashed;">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="font-size:20px;flex-shrink:0">💡</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:4px">How it works</div>
+          <div style="font-size:13.5px;color:var(--text-muted);line-height:1.6">
+            This tool uses the <strong>@imgly/background-removal</strong> AI model running entirely in your browser via WebAssembly. The model downloads once (~40MB) and then works offline. Best results on photos with clear subjects.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    let resultBlob = null;
+
+    // Drag & drop
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) handleFile(file);
+    });
+
+    window.handleFile = async function(file) {
+      if (!file) return;
+
+      const resultCard = document.getElementById('resultCard');
+      const processingState = document.getElementById('processingState');
+      const beforeAfter = document.getElementById('beforeAfter');
+      const resultActions = document.getElementById('resultActions');
+      const progressBar = document.getElementById('progressBar');
+      const progressLabel = document.getElementById('progressLabel');
+
+      // Show original preview
+      const originalUrl = URL.createObjectURL(file);
+      document.getElementById('originalImg').src = originalUrl;
+
+      // Show result card + processing state
+      resultCard.style.display = 'block';
+      processingState.style.display = 'flex';
+      beforeAfter.style.display = 'none';
+      resultActions.style.display = 'none';
+
+      progressBar.style.width = '5%';
+      progressLabel.textContent = 'Loading AI model…';
+
+      try {
+        const { removeBackground } = await import(
+          'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/web/index.mjs'
+        );
+
+        progressBar.style.width = '30%';
+        progressLabel.textContent = 'Model loaded, processing image…';
+
+        resultBlob = await removeBackground(file, {
+          progress: (key, current, total) => {
+            if (total > 0) {
+              const pct = Math.round((current / total) * 60) + 30;
+              progressBar.style.width = Math.min(pct, 90) + '%';
+              progressLabel.textContent = `${key} — ${Math.round((current/total)*100)}%`;
+            }
+          }
+        });
+
+        progressBar.style.width = '100%';
+        progressLabel.textContent = 'Done!';
+
+        const resultUrl = URL.createObjectURL(resultBlob);
+        document.getElementById('resultImg').src = resultUrl;
+
+        setTimeout(() => {
+          processingState.style.display = 'none';
+          beforeAfter.style.display = 'grid';
+          resultActions.style.display = 'flex';
+        }, 400);
+
+      } catch (err) {
+        console.error(err);
+        processingState.style.display = 'none';
+        const statusMsg = document.getElementById('statusMsg');
+        statusMsg.style.display = 'flex';
+        statusMsg.className = 'status error fade-in';
+        statusMsg.innerHTML = `<div class="status-dot"></div><div><strong>Error:</strong> ${err.message || 'Failed to remove background. Try a different image or browser.'}</div>`;
+        resultCard.style.display = 'none';
+      }
+    };
+
+    window.downloadResult = function() {
+      if (!resultBlob) return;
+      const link = document.createElement('a');
+      link.download = 'palmtools_bg_removed.png';
+      link.href = URL.createObjectURL(resultBlob);
+      link.click();
+    };
+
+    window.resetTool = function() {
+      resultBlob = null;
+      document.getElementById('resultCard').style.display = 'none';
+      document.getElementById('statusMsg').style.display = 'none';
+      document.getElementById('fileInput').value = '';
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Image to PDF — PALMTOOLS</title>
+  <link rel="stylesheet" href="../shared.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    .images-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .img-item {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      border: 1.5px solid var(--border-subtle);
+      background: var(--bg-2);
+      cursor: grab;
+    }
+    .img-item img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .img-item .img-remove {
+      position: absolute;
+      top: 5px; right: 5px;
+      width: 24px; height: 24px;
+      background: rgba(0,0,0,0.65);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+      line-height: 1;
+    }
+    .img-item .img-remove:hover { background: #dc2626; }
+    .img-item .img-num {
+      position: absolute;
+      bottom: 5px; left: 5px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .img-item.dragging { opacity: 0.4; }
+    .img-item.drag-target { outline: 2px solid var(--orange); }
+
+    .add-more-btn {
+      aspect-ratio: 1;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      background: var(--bg-2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-faint);
+      font-family: 'Syne', sans-serif;
+      position: relative;
+    }
+    .add-more-btn input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .add-more-btn:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+      background: var(--orange-glow);
+    }
+    .add-more-btn .plus { font-size: 26px; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 16px;
+    }
+    .empty-hint {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 14px;
+    }
+    .counter-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px; height: 22px;
+      background: linear-gradient(135deg, var(--orange), var(--amber));
+      color: white;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 0 6px;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tool-page">
+    <nav class="tool-nav">
+      <a class="back-btn" href="../index.html">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Back to PALMTOOLS
+      </a>
+    </nav>
+
+    <header class="tool-header">
+      <div class="tool-icon-badge">🖼️</div>
+      <h1 class="tool-title">Image <span class="accent">to PDF</span></h1>
+      <p class="tool-subtitle">Convert one or multiple images into a single PDF. Drag to reorder, pick page size, and download.</p>
+    </header>
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card-title">
+        Images
+        <span class="counter-badge" id="imgCount">0</span>
+      </div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="addImages(this.files)" />
+        <div class="drop-zone-icon">📁</div>
+        <h3>Drop images here</h3>
+        <p>or <span class="browse-link">browse files</span> · JPG, PNG, WebP · Multiple allowed</p>
+      </div>
+      <div id="imagesList" style="display:none">
+        <div class="images-list" id="imagesGrid"></div>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="card">
+      <div class="card-title">PDF Options</div>
+      <div class="options-grid">
+        <div class="field">
+          <label class="label">Page Size</label>
+          <select class="input" id="pageSize">
+            <option value="a4">A4 (210×297mm)</option>
+            <option value="letter">Letter (8.5×11in)</option>
+            <option value="a3">A3 (297×420mm)</option>
+            <option value="a5">A5 (148×210mm)</option>
+            <option value="square">Square (200×200mm)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Orientation</label>
+          <select class="input" id="orientation">
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+            <option value="auto">Auto (per image)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Image Fit</label>
+          <select class="input" id="imageFit">
+            <option value="fit">Fit (keep ratio)</option>
+            <option value="fill">Fill page</option>
+            <option value="center">Center (no scale)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Margin (mm)</label>
+          <select class="input" id="margin">
+            <option value="0">None</option>
+            <option value="5">Small (5mm)</option>
+            <option value="10" selected>Medium (10mm)</option>
+            <option value="20">Large (20mm)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Convert -->
+    <div class="card">
+      <div class="card-title">Convert</div>
+      <div id="convertStatus" style="display:none"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="convertBtn" onclick="convertToPDF()" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Convert &amp; Download PDF
+        </button>
+        <button class="btn btn-ghost" onclick="clearAll()">Clear all</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let images = []; // { file, url, name }
+    let dragSrcIdx = null;
+
+    // Drag & drop zone
+    const dz = document.getElementById('dropZone');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      addImages(files);
+    });
+
+    function addImages(files) {
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const url = URL.createObjectURL(file);
+        images.push({ file, url, name: file.name });
+      });
+      renderImages();
+    }
+
+    function renderImages() {
+      const grid = document.getElementById('imagesGrid');
+      const listWrap = document.getElementById('imagesList');
+      const counter = document.getElementById('imgCount');
+      const convertBtn = document.getElementById('convertBtn');
+
+      counter.textContent = images.length;
+      convertBtn.disabled = images.length === 0;
+
+      if (images.length === 0) {
+        listWrap.style.display = 'none';
+        return;
+      }
+      listWrap.style.display = 'block';
+      grid.innerHTML = '';
+
+      images.forEach((img, idx) => {
+        const item = document.createElement('div');
+        item.className = 'img-item';
+        item.draggable = true;
+        item.dataset.idx = idx;
+        item.innerHTML = `
+          <img src="${img.url}" alt="${img.name}" />
+          <button class="img-remove" onclick="removeImage(${idx})" title="Remove">✕</button>
+          <div class="img-num">${idx + 1}</div>
+        `;
+        item.addEventListener('dragstart', () => { dragSrcIdx = idx; item.classList.add('dragging'); });
+        item.addEventListener('dragend', () => item.classList.remove('dragging'));
+        item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-target'); });
+        item.addEventListener('dragleave', () => item.classList.remove('drag-target'));
+        item.addEventListener('drop', e => {
+          e.preventDefault();
+          item.classList.remove('drag-target');
+          if (dragSrcIdx === null || dragSrcIdx === idx) return;
+          const moved = images.splice(dragSrcIdx, 1)[0];
+          images.splice(idx, 0, moved);
+          dragSrcIdx = null;
+          renderImages();
+        });
+        grid.appendChild(item);
+      });
+
+      // Add more button
+      const addBtn = document.createElement('div');
+      addBtn.className = 'add-more-btn';
+      addBtn.innerHTML = `
+        <input type="file" accept="image/*" multiple onchange="addImages(this.files)" />
+        <div class="plus">+</div>
+        <div>Add more</div>
+      `;
+      grid.appendChild(addBtn);
+    }
+
+    function removeImage(idx) {
+      URL.revokeObjectURL(images[idx].url);
+      images.splice(idx, 1);
+      renderImages();
+    }
+
+    function clearAll() {
+      images.forEach(img => URL.revokeObjectURL(img.url));
+      images = [];
+      renderImages();
+      document.getElementById('fileInput').value = '';
+    }
+
+    async function convertToPDF() {
+      if (images.length === 0) return;
+
+      const btn = document.getElementById('convertBtn');
+      const statusEl = document.getElementById('convertStatus');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Converting…';
+      statusEl.style.display = 'flex';
+      statusEl.className = 'status info fade-in';
+      statusEl.innerHTML = '<div class="status-dot"></div>Processing images…';
+
+      try {
+        const { jsPDF } = window.jspdf;
+
+        const pageSizeVal = document.getElementById('pageSize').value;
+        const orientPref = document.getElementById('orientation').value;
+        const fitMode = document.getElementById('imageFit').value;
+        const margin = parseInt(document.getElementById('margin').value);
+
+        const pageSizes = {
+          a4: [210, 297],
+          letter: [215.9, 279.4],
+          a3: [297, 420],
+          a5: [148, 210],
+          square: [200, 200],
+        };
+        const [pw, ph] = pageSizes[pageSizeVal] || pageSizes.a4;
+
+        let pdf = null;
+
+        for (let i = 0; i < images.length; i++) {
+          statusEl.innerHTML = `<div class="status-dot"></div>Processing image ${i + 1} of ${images.length}…`;
+
+          const imgData = await loadImageData(images[i].url);
+          const iw = imgData.width;
+          const ih = imgData.height;
+
+          // Determine orientation for this page
+          let orient = orientPref;
+          if (orientPref === 'auto') {
+            orient = iw > ih ? 'landscape' : 'portrait';
+          }
+
+          const pageW = orient === 'landscape' ? Math.max(pw, ph) : Math.min(pw, ph);
+          const pageH = orient === 'landscape' ? Math.min(pw, ph) : Math.max(pw, ph);
+
+          if (i === 0) {
+            pdf = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: orient });
+          } else {
+            pdf.addPage([pageW, pageH], orient);
+          }
+
+          // Calculate image placement
+          const availW = pageW - margin * 2;
+          const availH = pageH - margin * 2;
+
+          let drawW, drawH, offsetX, offsetY;
+
+          if (fitMode === 'fill') {
+            drawW = availW;
+            drawH = availH;
+            offsetX = margin;
+            offsetY = margin;
+          } else if (fitMode === 'center') {
+            const scale = Math.min(1, availW / iw, availH / ih);
+            drawW = (iw * scale * 25.4) / 96;
+            drawH = (ih * scale * 25.4) / 96;
+            // Convert px to mm
+            const mmW = iw * 0.264583;
+            const mmH = ih * 0.264583;
+            const scaleF = Math.min(1, availW / mmW, availH / mmH);
+            drawW = mmW * scaleF;
+            drawH = mmH * scaleF;
+            offsetX = margin + (availW - drawW) / 2;
+            offsetY = margin + (availH - drawH) / 2;
+          } else {
+            // fit
+            const mmW = iw * 0.264583;
+            const mmH = ih * 0.264583;
+            const scaleF = Math.min(availW / mmW, availH / mmH);
+            drawW = mmW * scaleF;
+            drawH = mmH * scaleF;
+            offsetX = margin + (availW - drawW) / 2;
+            offsetY = margin + (availH - drawH) / 2;
+          }
+
+          const fmt = images[i].file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(imgData.dataUrl, fmt, offsetX, offsetY, drawW, drawH);
+        }
+
+        pdf.save('palmtools_images.pdf');
+
+        statusEl.className = 'status success fade-in';
+        statusEl.innerHTML = '<div class="status-dot"></div>PDF downloaded successfully!';
+
+      } catch (err) {
+        console.error(err);
+        statusEl.className = 'status error fade-in';
+        statusEl.innerHTML = `<div class="status-dot"></div>Error: ${err.message}`;
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Convert &amp; Download PDF`;
+    }
+
+    function loadImageData(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: img.naturalWidth, height: img.naturalHeight });
+        };
+        img.onerror = reject;
+        img.crossOrigin = 'anonymous';
+        img.src = url;
+      });
+    }
+  </script>
+</body>
+</html>

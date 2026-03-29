@@ -163,9 +163,9 @@
         <div class="field">
           <label class="label">Margin</label>
           <select class="input" id="margin">
-            <option value="10">Narrow</option>
-            <option value="20" selected>Normal</option>
-            <option value="30">Wide</option>
+            <option value="10">Narrow (10mm)</option>
+            <option value="20" selected>Normal (20mm)</option>
+            <option value="30">Wide (30mm)</option>
           </select>
         </div>
         <div class="field">
@@ -249,6 +249,16 @@
       }
     }
 
+    // Helper: Determine if a hex color is "dark" so we can flip text color automatically
+    function getContrastTextColor(hex) {
+      if (!hex) return '#000000';
+      const r = parseInt(hex.substr(1, 2), 16);
+      const g = parseInt(hex.substr(3, 2), 16);
+      const b = parseInt(hex.substr(5, 2), 16);
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      return (yiq >= 128) ? '#000000' : '#ffffff';
+    }
+
     // 3. Process PDF (Handles both Previewing and Saving)
     function processPDF(action) {
       const contentHTML = quill.root.innerHTML;
@@ -281,22 +291,34 @@
 
       // Get page background color
       const pageBgColor = document.getElementById('pageBg').value;
+      const baseTextColor = getContrastTextColor(pageBgColor);
 
-      // Create a hidden container to accurately render HTML structure for PDF compilation
+      // We wrap the content in a hidden fixed element to let html2canvas process it natively
+      const hiddenWrap = document.createElement('div');
+      hiddenWrap.style.position = 'fixed';
+      hiddenWrap.style.left = '0';
+      hiddenWrap.style.top = '100%'; // Pushed out of view safely
+      hiddenWrap.style.width = '800px';
+      hiddenWrap.style.zIndex = '-1000';
+
       const printContainer = document.createElement('div');
       printContainer.className = 'ql-editor'; 
-      printContainer.innerHTML = `<style>img { max-width: 100%; height: auto; }</style>` + contentHTML;
-      printContainer.style.width = '800px'; 
-      printContainer.style.position = 'absolute';
-      printContainer.style.left = '-9999px';
-      printContainer.style.top = '0';
-      
-      // Apply background color so it affects the entire document
+      // Force base text color so Dark Mode doesn't cause white text on white backgrounds
+      printContainer.style.color = baseTextColor; 
       printContainer.style.backgroundColor = pageBgColor;
-      // Force minimum height to ensure short documents still have full-page background color
-      printContainer.style.minHeight = '1122px'; // roughly A4 height in px
+      printContainer.style.minHeight = '1122px'; // Ensures short docs fill A4 background
       
-      document.body.appendChild(printContainer);
+      printContainer.innerHTML = contentHTML;
+      
+      // Auto-scale raw images to prevent layout breaking inside the PDF bounds
+      const imgs = printContainer.querySelectorAll('img');
+      imgs.forEach(img => {
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+      });
+
+      hiddenWrap.appendChild(printContainer);
+      document.body.appendChild(hiddenWrap);
 
       const marginMm = parseInt(document.getElementById('margin').value);
       const filename = (title || 'palmtools_document').toLowerCase().replace(/[^a-z0-9]+/g,'_') + '.pdf';
@@ -314,29 +336,31 @@
         }
       };
 
-      // Generate the PDF using the correct .output('bloburl') function call
       if (action === 'preview') {
-        html2pdf().set(opt).from(printContainer).output('bloburl').then(function(pdfUrl) {
-          document.body.removeChild(printContainer);
+        // Direct route to grab the Blob URL through the jsPDF instance
+        html2pdf().set(opt).from(printContainer).toPdf().get('pdf').then(function(pdfObj) {
+          const pdfUrl = pdfObj.output('bloburl');
           document.getElementById('previewWrapper').style.display = 'block';
           document.getElementById('pdfIframe').src = pdfUrl;
+          
+          document.body.removeChild(hiddenWrap); // Cleanup
           btn.disabled = false;
           btn.innerHTML = origBtnHtml;
         }).catch(err => {
-          document.body.removeChild(printContainer);
+          document.body.removeChild(hiddenWrap);
           btn.disabled = false;
           btn.innerHTML = origBtnHtml;
           alert("Preview error: " + err.message);
         });
       } else {
         html2pdf().set(opt).from(printContainer).save().then(() => {
-          document.body.removeChild(printContainer); 
+          document.body.removeChild(hiddenWrap); // Cleanup
           statusEl.className = 'status success fade-in';
           statusEl.innerHTML = '<div class="status-dot"></div>PDF downloaded successfully!';
           btn.disabled = false;
           btn.innerHTML = origBtnHtml;
         }).catch(err => {
-          document.body.removeChild(printContainer);
+          document.body.removeChild(hiddenWrap);
           statusEl.className = 'status error fade-in';
           statusEl.innerHTML = `<div class="status-dot"></div>Error: ${err.message}`;
           btn.disabled = false;

@@ -4,7 +4,9 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Text to PDF — PALMTOOLS</title>
+  
   <link rel="stylesheet" href="../shared.css"/>
+  
   <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -654,44 +656,75 @@
       });
     }
 
-    // Pass the DOM element completely detached so it doesn't break styling layout
-    const container = document.createElement('div');
-    container.style.cssText = `width: 794px; background: ${theme.pageBg}; color: ${theme.textColor}; font-family: ${fontFamily}; font-size: ${fontSize}; line-height: ${lineHeight}; ${theme.bodyExtra}`;
+    // 1. Create a safe wrapper inside the DOM so the browser maps it perfectly.
+    // It is positioned absolute, hidden by opacity, and safely stacked behind the app.
+    const wrapper = document.createElement('div');
+    wrapper.id = "pdf-temp-wrapper";
+    wrapper.style.cssText = `
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 800px; 
+      opacity: 0; 
+      pointer-events: none; 
+      z-index: -9999; 
+      background: ${theme.pageBg}; 
+      font-family: ${fontFamily}; 
+      font-size: ${fontSize}; 
+      line-height: ${lineHeight}; 
+      ${theme.bodyExtra}
+    `;
     
-    // Removed the "min-height: 1000px" which was forcing the page blank
-    container.innerHTML = `
+    // 2. We inject a local <style> block directly into the wrapper.
+    // This stops Dark Mode CSS from turning the text white, BUT we use 
+    // :not([style*="color"]) to ensure any custom colors you made in the editor stay intact!
+    wrapper.innerHTML = `
+      <style>
+        #pdf-temp-wrapper,
+        #pdf-temp-wrapper p, 
+        #pdf-temp-wrapper div, 
+        #pdf-temp-wrapper li, 
+        #pdf-temp-wrapper blockquote, 
+        #pdf-temp-wrapper span:not([style*="color"]) {
+          color: ${theme.textColor} !important;
+        }
+        #pdf-temp-wrapper h1, 
+        #pdf-temp-wrapper h2, 
+        #pdf-temp-wrapper h3, 
+        #pdf-temp-wrapper h4, 
+        #pdf-temp-wrapper h5, 
+        #pdf-temp-wrapper h6 {
+          color: ${theme.headColor} !important;
+        }
+        #pdf-temp-wrapper img {
+          max-width: 100%;
+          height: auto;
+        }
+      </style>
       ${coverHTML}
-      <div style="padding:${marginMm * 1.5}px;">
+      <div class="ql-editor" style="padding: ${marginMm * 1.5}px;">
         ${contentHTML}
       </div>
     `;
 
-    // Force text colors to fix the Dark Mode bug, but skip user's custom text colors (like your red text!)
-    container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
-      if (!h.style.color) h.style.color = theme.headColor;
-    });
-    container.querySelectorAll('p, span, div, li, a, blockquote').forEach(el => {
-      if (!el.style.color) el.style.color = theme.textColor;
-    });
-    container.querySelectorAll('img').forEach(img => {
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-    });
+    document.body.appendChild(wrapper);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
 
+    // Notice we REMOVED the 'avoid-all' setting to stop the text from jumping off the page
     const opt = {
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
-      filename,
+      filename:    filename,
       image:       { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
-      // REMOVED 'avoid-all' -> This is what caused the massive empty space on export
-      pagebreak:   { mode: ['css', 'legacy'] },
+      pagebreak:   { mode: ['css', 'legacy'] }, 
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
 
-    html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
+    const cleanup = () => { if (document.body.contains(wrapper)) document.body.removeChild(wrapper); };
+
+    html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
       const pgW   = pdf.internal.pageSize.getWidth();
       const pgH   = pdf.internal.pageSize.getHeight();
@@ -736,13 +769,15 @@
         }
       }
 
+      cleanup(); // Erase wrapper immediately once captured
+
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
         const previewWrapper = document.getElementById('previewWrapper');
         
         previewWrapper.innerHTML = `
-          <div class="preview-frame" style="padding: 40px 20px; text-align: center;">
-            <p style="color: var(--text-muted); margin-bottom: 16px;">Click below to view your generated document.</p>
+          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <p style="color: var(--text-muted); margin-bottom: 16px; font-family: 'DM Sans', sans-serif;">Your document is ready to preview.</p>
             <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
           </div>
         `;
@@ -758,6 +793,7 @@
         btn.innerHTML = origHTML;
       }
     }).catch(err => {
+      cleanup();
       btn.disabled  = false;
       btn.innerHTML = origHTML;
       if (action === 'save') {

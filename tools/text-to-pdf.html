@@ -658,15 +658,18 @@
       });
     }
 
-    // FIX 1: Create the container but DO NOT attach it to the body.
-    // html2pdf natively handles cloning unattached elements into a hidden iframe.
+    // FIX 1: Create the container, give it a hardcoded width so html2canvas doesn't squish it,
+    // and temporarily mount it off-screen so the browser can calculate the text layout.
     const container = document.createElement('div');
-    container.style.cssText = `font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};background:${theme.pageBg};color:${theme.textColor};${theme.bodyExtra}`;
-
+    container.style.cssText = `position:absolute; left:-9999px; top:0; width:800px; font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};background:${theme.pageBg};color:${theme.textColor};${theme.bodyExtra}`;
+    
     container.innerHTML = `
       ${coverHTML}
       <div class="ql-editor" style="padding:${marginMm * 1.5}px;font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};color:${theme.textColor};background:${theme.pageBg};min-height:1000px;${theme.bodyExtra}">${contentHTML}</div>
     `;
+
+    // Append to body to give it a physical layout
+    document.body.appendChild(container);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
@@ -675,10 +678,13 @@
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
       filename,
       image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
       pagebreak:   { mode: ['avoid-all','css','legacy'] },
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
+
+    // Helper to immediately remove the off-screen element when done
+    const cleanup = () => { if (document.body.contains(container)) document.body.removeChild(container); };
 
     html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
@@ -725,29 +731,20 @@
         }
       }
 
+      cleanup(); // Clean up the DOM immediately after PDF generation
+
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
         const previewWrapper = document.getElementById('previewWrapper');
         
-        // FIX 2: Detect mobile and fallback to a direct link instead of an iframe
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        // FIX 2: Universal "New Tab" button instead of an iframe
+        previewWrapper.innerHTML = `
+          <div style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px;">
+            <p style="color: var(--text-muted); margin-bottom: 16px;">Click below to view your generated document.</p>
+            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
+          </div>
+        `;
         
-        if (isMobile) {
-          previewWrapper.innerHTML = `
-            <div style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px;">
-              <p style="color: var(--text-muted); margin-bottom: 16px;">Mobile browsers do not support inline PDF previews.</p>
-              <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
-            </div>
-          `;
-        } else {
-          previewWrapper.innerHTML = `
-            <div class="preview-frame">
-              <iframe id="pdfIframe" style="width:100%;height:100%;border:none;"></iframe>
-            </div>
-          `;
-          document.getElementById('pdfIframe').src = blobUrl;
-        }
-
         previewWrapper.style.display = 'block';
         btn.disabled  = false;
         btn.innerHTML = origHTML;
@@ -759,6 +756,7 @@
         btn.innerHTML = origHTML;
       }
     }).catch(err => {
+      cleanup();
       btn.disabled  = false;
       btn.innerHTML = origHTML;
       if (action === 'save') {

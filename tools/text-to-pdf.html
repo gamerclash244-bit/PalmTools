@@ -597,11 +597,10 @@
     document.getElementById('exportStatus').style.display  = 'none';
   }
 
-  // ── PDF ENGINE: REBUILT FROM SCRATCH
+  // ── PDF ENGINE (Direct DOM Rendering for Mobile Compatibility) ──
   function runPDF(action) {
     const contentHTML = quill.root.innerHTML;
     const textContent = quill.getText().trim();
-    // Validate we actually have something to print
     const hasContent  = textContent.length > 0 || contentHTML.includes('<img');
     const statusEl    = document.getElementById('exportStatus');
     const btn         = document.getElementById(action === 'preview' ? 'previewBtn' : 'exportBtn');
@@ -618,7 +617,6 @@
       return;
     }
 
-    // Set Loading UI
     btn.disabled  = true;
     btn.innerHTML = `<div class="spinner"></div>${action === 'preview' ? 'Rendering…' : 'Generating…'}`;
     if (action === 'save') {
@@ -627,7 +625,6 @@
       statusEl.innerHTML  = '<div class="status-dot"></div>Building your PDF…';
     }
 
-    // Capture User Inputs
     const theme      = THEMES[currentTheme];
     const fontFamily = document.getElementById('fontFamily').value;
     const fontSize   = document.getElementById('bodyFontSize').value;
@@ -652,57 +649,56 @@
       });
     }
 
-    // THE FIX:
-    // We construct a raw HTML string and hand it DIRECTLY to html2pdf. 
-    // This entirely skips the buggy DOM injection + offscreen Mobile canvas limits.
-    // We also inject CSS to OVERRIDE Quill's 'overflow-y: auto' class which breaks page breaks.
-    const exportHTML = `
-      <div id="pdf-export-wrapper" style="
-        font-family: ${fontFamily}; 
-        font-size: ${fontSize}; 
-        line-height: ${lineHeight}; 
-        background-color: ${theme.pageBg}; 
-        color: ${theme.textColor}; 
-        ${theme.bodyExtra}
-      ">
-        <style>
-          /* 1. Stop html2canvas from rendering a blank 0-height scroll box */
-          #pdf-export-wrapper .ql-editor {
-            overflow: visible !important;
-            height: auto !important;
-            min-height: auto !important;
-            padding: ${marginMm * 1.5}px !important;
-          }
-          /* 2. Force text to match template so dark mode doesn't print invisible white text */
-          #pdf-export-wrapper .ql-editor p,
-          #pdf-export-wrapper .ql-editor li,
-          #pdf-export-wrapper .ql-editor div,
-          #pdf-export-wrapper .ql-editor blockquote {
-            color: ${theme.textColor};
-          }
-          #pdf-export-wrapper .ql-editor h1,
-          #pdf-export-wrapper .ql-editor h2,
-          #pdf-export-wrapper .ql-editor h3,
-          #pdf-export-wrapper .ql-editor h4,
-          #pdf-export-wrapper .ql-editor h5,
-          #pdf-export-wrapper .ql-editor h6 {
-            color: ${theme.headColor};
-          }
-          /* Protect images */
-          #pdf-export-wrapper .ql-editor img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-          }
-        </style>
-        
-        ${coverHTML}
-        
-        <div class="ql-editor">
-          ${contentHTML}
-        </div>
+    // 1. Create a physical container attached to the document body.
+    // This solves the mobile blank screen issue because the mobile browser is forced to paint it.
+    const printContainer = document.createElement('div');
+    printContainer.id = "pdf-temp-wrapper";
+    printContainer.style.cssText = `
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 800px; 
+      z-index: -9999; 
+      background-color: ${theme.pageBg}; 
+      font-family: ${fontFamily}; 
+      font-size: ${fontSize}; 
+      line-height: ${lineHeight}; 
+      ${theme.bodyExtra}
+    `;
+
+    // 2. Inject the HTML WITHOUT the `.ql-editor` class wrapper to prevent Quill's 
+    // internal CSS (like overflow-y: auto) from completely breaking the PDF engine.
+    printContainer.innerHTML = `
+      ${coverHTML}
+      <div style="padding: ${marginMm * 1.5}px; color: ${theme.textColor};">
+        ${contentHTML}
       </div>
     `;
+
+    // 3. Force the template colors onto the text to override your app's Dark Mode (white text),
+    // but SKIP elements where the user manually changed the color in the editor.
+    const elements = printContainer.querySelectorAll('*');
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (el.style && el.style.color) continue; // Protects custom Quill colors
+      
+      const tag = el.tagName.toUpperCase();
+      if (['H1','H2','H3','H4','H5','H6'].includes(tag)) {
+        el.style.color = theme.headColor;
+      } else if (['P','SPAN','DIV','LI','A','BLOCKQUOTE','STRONG','EM'].includes(tag)) {
+        el.style.color = theme.textColor;
+      }
+    }
+
+    // Protect Images
+    printContainer.querySelectorAll('img').forEach(img => {
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+    });
+
+    // 4. Temporarily add it to the live page layout
+    document.body.appendChild(printContainer);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
@@ -711,13 +707,12 @@
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
       filename:    filename,
       image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
       pagebreak:   { mode: ['css', 'legacy'] },
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
 
-    // Feed html2pdf the raw string (safest method)
-    html2pdf().set(opt).from(exportHTML).toPdf().get('pdf').then(pdf => {
+    html2pdf().set(opt).from(printContainer).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
       const pgW   = pdf.internal.pageSize.getWidth();
       const pgH   = pdf.internal.pageSize.getHeight();
@@ -726,7 +721,6 @@
       const lineRGB  = isDark ? [55,75,105]    : [210,210,210];
       const txtRGB   = isDark ? [110,135,165]  : [150,150,150];
 
-      // Draw Headers and Footers
       for (let i = 1; i <= total; i++) {
         pdf.setPage(i);
         const isCoverPage = hasCover && i === 1;
@@ -763,15 +757,17 @@
         }
       }
 
+      // 5. Clean up the physical element we appended
+      document.body.removeChild(printContainer);
+
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
         const previewWrapper = document.getElementById('previewWrapper');
         
         previewWrapper.innerHTML = `
-          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: auto; background: var(--bg-2);">
-            <p style="color: var(--text); margin-bottom: 8px; font-weight: 600; font-family: 'DM Sans', sans-serif;">Preview Ready</p>
-            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px; font-family: 'DM Sans', sans-serif;">Tap below to open your document securely.</p>
-            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex; width: auto;">Open PDF in New Tab</a>
+          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; background: var(--bg-2);">
+            <p style="color: var(--text-muted); margin-bottom: 16px;">Your document is ready to preview.</p>
+            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
           </div>
         `;
         
@@ -786,6 +782,10 @@
         btn.innerHTML = origHTML;
       }
     }).catch(err => {
+      // Ensure we clean up even if it fails
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
+      }
       btn.disabled  = false;
       btn.innerHTML = origHTML;
       if (action === 'save') {

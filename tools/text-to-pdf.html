@@ -164,9 +164,9 @@
 
     /* ── PREVIEW ── */
     .preview-frame {
-      margin-top: 18px; height: 640px;
-      border: 1.5px solid var(--border-subtle); border-radius: 12px;
-      overflow: hidden; background: var(--bg-2);
+      margin-top: 18px;
+      border: 1.5px dashed var(--border-subtle); border-radius: 12px;
+      background: var(--bg-2);
     }
 
     .section-rule { border: none; border-top: 1px solid var(--border-subtle); margin: 18px 0; }
@@ -654,33 +654,29 @@
       });
     }
 
-    // FIX: Attach it to the viewport so the mobile browser actually paints it, 
-    // but put it at z-index: -9999 so it's hidden safely behind your dark mode background!
+    // Pass the DOM element completely detached so it doesn't break styling layout
     const container = document.createElement('div');
-    container.style.cssText = `position:fixed; left:0; top:0; width:800px; z-index:-9999; font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};background:${theme.pageBg};color:${theme.textColor};${theme.bodyExtra}`;
+    container.style.cssText = `width: 794px; background: ${theme.pageBg}; color: ${theme.textColor}; font-family: ${fontFamily}; font-size: ${fontSize}; line-height: ${lineHeight}; ${theme.bodyExtra}`;
     
+    // Removed the "min-height: 1000px" which was forcing the page blank
     container.innerHTML = `
       ${coverHTML}
-      <div class="ql-editor" style="padding:${marginMm * 1.5}px; min-height:1000px; background:${theme.pageBg};">
+      <div style="padding:${marginMm * 1.5}px;">
         ${contentHTML}
       </div>
     `;
 
-    // FIX: The Dark Mode Color Bleed Fix
-    // We forcefully loop through all the text and reset it to the PDF theme color, 
-    // UNLESS the user explicitly highlighted it with the custom color tool.
+    // Force text colors to fix the Dark Mode bug, but skip user's custom text colors (like your red text!)
     container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
       if (!h.style.color) h.style.color = theme.headColor;
     });
-    container.querySelectorAll('p, span, li, ul, ol, blockquote, a, strong, em, u, code, pre').forEach(el => {
+    container.querySelectorAll('p, span, div, li, a, blockquote').forEach(el => {
       if (!el.style.color) el.style.color = theme.textColor;
     });
     container.querySelectorAll('img').forEach(img => {
       img.style.maxWidth = '100%';
       img.style.height = 'auto';
     });
-
-    document.body.appendChild(container);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
@@ -689,13 +685,11 @@
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
       filename,
       image:       { type: 'jpeg', quality: 0.98 },
-      // windowWidth guarantees html2canvas doesn't squish elements on a narrow mobile screen
       html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
-      pagebreak:   { mode: ['avoid-all','css','legacy'] },
+      // REMOVED 'avoid-all' -> This is what caused the massive empty space on export
+      pagebreak:   { mode: ['css', 'legacy'] },
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
-
-    const cleanup = () => { if (document.body.contains(container)) document.body.removeChild(container); };
 
     html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
@@ -742,14 +736,12 @@
         }
       }
 
-      cleanup(); // Erase the background container as soon as the PDF renders
-
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
         const previewWrapper = document.getElementById('previewWrapper');
         
         previewWrapper.innerHTML = `
-          <div style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px;">
+          <div class="preview-frame" style="padding: 40px 20px; text-align: center;">
             <p style="color: var(--text-muted); margin-bottom: 16px;">Click below to view your generated document.</p>
             <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
           </div>
@@ -766,7 +758,6 @@
         btn.innerHTML = origHTML;
       }
     }).catch(err => {
-      cleanup();
       btn.disabled  = false;
       btn.innerHTML = origHTML;
       if (action === 'save') {

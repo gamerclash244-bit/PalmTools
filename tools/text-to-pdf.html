@@ -213,14 +213,14 @@
 
     // 2. Initialize Quill Rich Text Editor
     const toolbarOptions = [
-      ['undo', 'redo'],                                  // Undo / Redo
-      [{ 'size': ['small', false, 'large', 'huge'] }],   // Font sizes
-      ['bold', 'italic', 'underline', 'strike'],         // Toggled styling
-      [{ 'color': [] }, { 'background': [] }],           // Text / Highlight Colors
-      [{ 'align': [] }],                                 // Alignments
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],      // Lists
-      ['image', 'link'],                                 // Media
-      ['clean']                                          // Clear formatting
+      ['undo', 'redo'],
+      [{ 'size': ['small', false, 'large', 'huge'] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'align': [] }],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['image', 'link'],
+      ['clean']
     ];
 
     const quill = new Quill('#editor-container', {
@@ -249,7 +249,6 @@
       }
     }
 
-    // Helper: Determine if a hex color is "dark" so we can flip text color automatically
     function getContrastTextColor(hex) {
       if (!hex) return '#000000';
       const r = parseInt(hex.substr(1, 2), 16);
@@ -279,7 +278,6 @@
         return;
       }
 
-      // UI Loading State
       btn.disabled = true;
       btn.innerHTML = `<div class="spinner"></div> ${action === 'preview' ? 'Rendering...' : 'Generating PDF...'}`;
       
@@ -289,28 +287,28 @@
         statusEl.innerHTML = '<div class="status-dot"></div>Formatting pages and generating your PDF…';
       }
 
-      // Get page background color
       const pageBgColor = document.getElementById('pageBg').value;
       const baseTextColor = getContrastTextColor(pageBgColor);
 
-      // We wrap the content in a hidden fixed element to let html2canvas process it natively
+      // FIX: Use position:absolute + left:-9999px instead of position:fixed + top:100%
+      // html2canvas cannot capture elements that are scrolled/pushed outside the viewport
+      // with fixed positioning. Off-screen via left:-9999px keeps the element in the
+      // render tree so html2canvas can paint it correctly.
       const hiddenWrap = document.createElement('div');
-      hiddenWrap.style.position = 'fixed';
-      hiddenWrap.style.left = '0';
-      hiddenWrap.style.top = '100%'; // Pushed out of view safely
+      hiddenWrap.style.position = 'absolute';
+      hiddenWrap.style.left = '-9999px';
+      hiddenWrap.style.top = '0';
       hiddenWrap.style.width = '800px';
       hiddenWrap.style.zIndex = '-1000';
 
       const printContainer = document.createElement('div');
       printContainer.className = 'ql-editor'; 
-      // Force base text color so Dark Mode doesn't cause white text on white backgrounds
       printContainer.style.color = baseTextColor; 
       printContainer.style.backgroundColor = pageBgColor;
-      printContainer.style.minHeight = '1122px'; // Ensures short docs fill A4 background
+      printContainer.style.minHeight = '1122px';
       
       printContainer.innerHTML = contentHTML;
       
-      // Auto-scale raw images to prevent layout breaking inside the PDF bounds
       const imgs = printContainer.querySelectorAll('img');
       imgs.forEach(img => {
         img.style.maxWidth = '100%';
@@ -337,13 +335,12 @@
       };
 
       if (action === 'preview') {
-        // Direct route to grab the Blob URL through the jsPDF instance
         html2pdf().set(opt).from(printContainer).toPdf().get('pdf').then(function(pdfObj) {
           const pdfUrl = pdfObj.output('bloburl');
           document.getElementById('previewWrapper').style.display = 'block';
           document.getElementById('pdfIframe').src = pdfUrl;
           
-          document.body.removeChild(hiddenWrap); // Cleanup
+          document.body.removeChild(hiddenWrap);
           btn.disabled = false;
           btn.innerHTML = origBtnHtml;
         }).catch(err => {
@@ -354,7 +351,7 @@
         });
       } else {
         html2pdf().set(opt).from(printContainer).save().then(() => {
-          document.body.removeChild(hiddenWrap); // Cleanup
+          document.body.removeChild(hiddenWrap);
           statusEl.className = 'status success fade-in';
           statusEl.innerHTML = '<div class="status-dot"></div>PDF downloaded successfully!';
           btn.disabled = false;
@@ -370,4 +367,4 @@
     }
   </script>
 </body>
-</html>
+              </html>

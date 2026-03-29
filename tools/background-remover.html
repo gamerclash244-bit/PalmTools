@@ -168,7 +168,7 @@
       if (file && file.type.startsWith('image/')) handleFile(file);
     });
 
-    window.handleFile = async function(file) {
+        window.handleFile = async function(file) {
       if (!file) return;
 
       const resultCard = document.getElementById('resultCard');
@@ -182,32 +182,58 @@
       const originalUrl = URL.createObjectURL(file);
       document.getElementById('originalImg').src = originalUrl;
 
-      // Show result card + processing state
+      // Show processing state
       resultCard.style.display = 'block';
       processingState.style.display = 'flex';
       beforeAfter.style.display = 'none';
       resultActions.style.display = 'none';
 
-      progressBar.style.width = '5%';
-      progressLabel.textContent = 'Loading AI model…';
+      progressBar.style.width = '30%';
+      progressLabel.textContent = 'Sending to your secure server...';
 
       try {
-        const { removeBackground } = await import(
-          'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/web/index.mjs'
-        );
+        const formData = new FormData();
+        formData.append('image', file);
 
-        progressBar.style.width = '30%';
-        progressLabel.textContent = 'Model loaded, processing image…';
+        progressBar.style.width = '60%';
+        progressLabel.textContent = 'AI is removing background...';
 
-        resultBlob = await removeBackground(file, {
-          progress: (key, current, total) => {
-            if (total > 0) {
-              const pct = Math.round((current / total) * 60) + 30;
-              progressBar.style.width = Math.min(pct, 90) + '%';
-              progressLabel.textContent = `${key} — ${Math.round((current/total)*100)}%`;
-            }
-          }
+        // Sending the image to your newly deployed Render API!
+        const response = await fetch('https://palmtools-api.onrender.com/remove-bg', {
+          method: 'POST',
+          body: formData
         });
+
+        if (!response.ok) throw new Error("Server processing failed.");
+
+        progressBar.style.width = '90%';
+        progressLabel.textContent = 'Finalizing image...';
+        
+        resultBlob = await response.blob();
+
+        progressBar.style.width = '100%';
+        progressLabel.textContent = 'Done!';
+
+        const resultUrl = URL.createObjectURL(resultBlob);
+        document.getElementById('resultImg').src = resultUrl;
+
+        setTimeout(() => {
+          processingState.style.display = 'none';
+          beforeAfter.style.display = 'grid';
+          resultActions.style.display = 'flex';
+        }, 400);
+
+      } catch (err) {
+        console.error(err);
+        processingState.style.display = 'none';
+        const statusMsg = document.getElementById('statusMsg');
+        statusMsg.style.display = 'flex';
+        statusMsg.className = 'status error fade-in';
+        statusMsg.innerHTML = `<div class="status-dot"></div><div><strong>Error:</strong> ${err.message || 'Failed to connect to AI server.'}</div>`;
+        resultCard.style.display = 'none';
+      }
+    };
+
 
         progressBar.style.width = '100%';
         progressLabel.textContent = 'Done!';

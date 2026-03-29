@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QR Code Builder — PALMTOOLS</title>
   <link rel="stylesheet" href="../shared.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://unpkg.com/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
   <style>
     .qr-preview-section {
       display: flex;
@@ -14,16 +14,22 @@
       gap: 24px;
     }
     .qr-canvas-wrap {
-      padding: 20px;
+      padding: 16px;
       background: white;
       border-radius: 18px;
       box-shadow: var(--shadow-hover);
       display: inline-block;
       line-height: 0;
+      /* Checkerboard background in case of transparent QR */
+      background-image: repeating-conic-gradient(#e5e5f7 0% 25%, #fff 0% 50%);
+      background-position: 0 0;
+      background-size: 16px 16px;
     }
-    #qrCanvas {
+    #qrCanvasWrap canvas {
       border-radius: 4px;
       display: block;
+      max-width: 100%;
+      height: auto !important;
     }
     .qr-empty-state {
       display: flex;
@@ -38,13 +44,14 @@
       font-size: 14px;
       font-family: 'Syne', sans-serif;
       font-weight: 600;
+      text-align: center;
     }
-    .size-badges {
+    .size-badges, .error-correction-row {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
-    .size-badge {
+    .toggle-btn {
       padding: 8px 16px;
       border-radius: 50px;
       border: 1.5px solid var(--border-subtle);
@@ -56,9 +63,334 @@
       transition: all 0.18s;
       font-family: 'DM Sans', sans-serif;
     }
-    .size-badge.active, .size-badge:hover {
+    .toggle-btn.active, .toggle-btn:hover {
       border-color: var(--orange);
       background: var(--orange-glow);
+      color: var(--orange);
+    }
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .range-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--orange);
+      min-width: 36px;
+      text-align: right;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .checkbox-label input {
+      accent-color: var(--orange);
+      width: 16px; height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tool-page">
+    <nav class="tool-nav">
+      <a class="back-btn" href="../index.html">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Back to PALMTOOLS
+      </a>
+    </nav>
+
+    <header class="tool-header">
+      <div class="tool-icon-badge">⬛</div>
+      <h1 class="tool-title">QR Code <span class="accent">Builder</span></h1>
+      <p class="tool-subtitle">Generate advanced QR codes. Customize patterns, colors, corners, and add your own logo instantly.</p>
+    </header>
+
+    <div class="card">
+      <div class="card-title">Content</div>
+      <div class="field">
+        <label class="label">Text or URL</label>
+        <textarea class="input" id="qrInput" placeholder="https://example.com  or  any text…" rows="3" style="min-height:90px;" oninput="scheduleGenerate()"></textarea>
+      </div>
+      <div class="field">
+        <label class="label">Error Correction (Raise this if using a logo)</label>
+        <div class="error-correction-row" id="ecRow">
+          <button class="toggle-btn active" data-ec="L" onclick="setEC(this, 'L')">L — Low</button>
+          <button class="toggle-btn" data-ec="M" onclick="setEC(this, 'M')">M — Medium</button>
+          <button class="toggle-btn" data-ec="Q" onclick="setEC(this, 'Q')">Q — Quartile</button>
+          <button class="toggle-btn" data-ec="H" onclick="setEC(this, 'H')">H — High</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Appearance & Branding</div>
+      
+      <div class="row" style="margin-bottom: 20px;">
+        <div class="col field" style="margin-bottom: 0;">
+          <label class="label">QR Color</label>
+          <div class="swatch-row">
+            <input type="color" id="colorDark" value="#1C1917" oninput="scheduleGenerate()" />
+            <span class="swatch-item">Foreground</span>
+          </div>
+        </div>
+        <div class="col field" style="margin-bottom: 0;">
+          <label class="label">Background</label>
+          <div class="swatch-row">
+            <input type="color" id="colorLight" value="#ffffff" oninput="scheduleGenerate()" />
+            <span class="swatch-item">Background</span>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="bgTransparent" onchange="toggleTransparentBg()" /> Transparent
+          </label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom: 20px;">
+        <div class="col field" style="margin-bottom: 0;">
+          <label class="label">Pattern Style</label>
+          <select class="input" id="dotStyle" onchange="scheduleGenerate()">
+            <option value="square">Square</option>
+            <option value="dots">Dots</option>
+            <option value="rounded">Rounded</option>
+            <option value="extra-rounded" selected>Extra Rounded</option>
+            <option value="classy">Classy</option>
+            <option value="classy-rounded">Classy Rounded</option>
+          </select>
+        </div>
+        <div class="col field" style="margin-bottom: 0;">
+          <label class="label">Corner Style</label>
+          <select class="input" id="cornerStyle" onchange="scheduleGenerate()">
+            <option value="square">Square</option>
+            <option value="dot">Dot</option>
+            <option value="extra-rounded" selected>Extra Rounded</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      
+      <div class="field">
+        <label class="label">Add Logo (Center Image)</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="file" id="logoInput" accept="image/*" style="display:none;" onchange="handleLogoUpload(this)" />
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logoInput').click()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Logo
+            </button>
+            <button class="btn btn-ghost btn-sm" id="clearLogoBtn" style="display:none; color: #dc2626;" onclick="clearLogo()">Remove Logo</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col field">
+          <label class="label">Size (px)</label>
+          <div class="size-badges" id="sizeBadges">
+            <button class="toggle-btn" data-size="256" onclick="setSize(this, 256)">256</button>
+            <button class="toggle-btn active" data-size="512" onclick="setSize(this, 512)">512</button>
+            <button class="toggle-btn" data-size="1024" onclick="setSize(this, 1024)">1024</button>
+          </div>
+        </div>
+        <div class="col field">
+          <label class="label">Margin — <span class="range-val" id="marginVal">10</span> px</label>
+          <div class="range-row">
+            <input type="range" id="marginRange" min="0" max="40" step="5" value="10" oninput="document.getElementById('marginVal').textContent=this.value; scheduleGenerate()" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Preview</div>
+      <div class="qr-preview-section" id="previewSection">
+        <div class="qr-empty-state" id="emptyState">
+          <div class="qr-empty-icon">⬛</div>
+          <div class="qr-empty-text">Type something above to generate your QR code</div>
+        </div>
+        
+        <div id="qrResult" style="display:none; flex-direction:column; align-items:center; gap:20px; width: 100%;">
+          <div class="qr-canvas-wrap" id="qrCanvasWrap">
+            </div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="downloadQR()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download PNG
+            </button>
+            <button class="btn btn-secondary" onclick="copyQR(this)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy Image
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let qrCodeInstance = null;
+    let currentEC = 'L';
+    let currentSize = 512;
+    let generateTimer = null;
+    let uploadedLogoUrl = null;
+
+    function setEC(btn, ec) {
+      currentEC = ec;
+      document.querySelectorAll('#ecRow .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      scheduleGenerate();
+    }
+
+    function setSize(btn, size) {
+      currentSize = size;
+      document.querySelectorAll('#sizeBadges .toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      scheduleGenerate();
+    }
+
+    function toggleTransparentBg() {
+      const isTransparent = document.getElementById('bgTransparent').checked;
+      const lightPicker = document.getElementById('colorLight');
+      lightPicker.disabled = isTransparent;
+      lightPicker.style.opacity = isTransparent ? '0.4' : '1';
+      scheduleGenerate();
+    }
+
+    function handleLogoUpload(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          uploadedLogoUrl = e.target.result;
+          document.getElementById('clearLogoBtn').style.display = 'inline-flex';
+          
+          // Auto-bump Error Correction to 'H' when a logo is added for better scanning
+          if (currentEC !== 'H') {
+            document.querySelector('#ecRow .toggle-btn[data-ec="H"]').click();
+          } else {
+            scheduleGenerate();
+          }
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function clearLogo() {
+      uploadedLogoUrl = null;
+      document.getElementById('logoInput').value = '';
+      document.getElementById('clearLogoBtn').style.display = 'none';
+      scheduleGenerate();
+    }
+
+    function scheduleGenerate() {
+      clearTimeout(generateTimer);
+      generateTimer = setTimeout(generate, 150);
+    }
+
+    function generate() {
+      const text = document.getElementById('qrInput').value.trim();
+      const emptyState = document.getElementById('emptyState');
+      const qrResult = document.getElementById('qrResult');
+
+      if (!text) {
+        emptyState.style.display = 'flex';
+        qrResult.style.display = 'none';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      qrResult.style.display = 'flex';
+
+      const darkColor = document.getElementById('colorDark').value;
+      const isTransparent = document.getElementById('bgTransparent').checked;
+      const lightColor = isTransparent ? "transparent" : document.getElementById('colorLight').value;
+      const margin = parseInt(document.getElementById('marginRange').value);
+      const dotStyle = document.getElementById('dotStyle').value;
+      const cornerStyle = document.getElementById('cornerStyle').value;
+
+      const options = {
+        width: currentSize,
+        height: currentSize,
+        type: "canvas",
+        data: text,
+        margin: margin,
+        qrOptions: {
+          typeNumber: 0,
+          mode: "Byte",
+          errorCorrectionLevel: currentEC
+        },
+        imageOptions: {
+          hideBackgroundDots: true,
+          imageSize: 0.4,
+          margin: 5,
+          crossOrigin: "anonymous"
+        },
+        dotsOptions: {
+          color: darkColor,
+          type: dotStyle
+        },
+        backgroundOptions: {
+          color: lightColor,
+        },
+        cornersSquareOptions: {
+          color: darkColor,
+          type: cornerStyle
+        },
+        cornersDotOptions: {
+          color: darkColor,
+          type: cornerStyle === 'square' ? 'square' : 'dot'
+        }
+      };
+
+      if (uploadedLogoUrl) {
+        options.image = uploadedLogoUrl;
+      } else {
+        options.image = undefined;
+      }
+
+      if (!qrCodeInstance) {
+        qrCodeInstance = new QRCodeStyling(options);
+        const container = document.getElementById('qrCanvasWrap');
+        container.innerHTML = '';
+        qrCodeInstance.append(container);
+      } else {
+        qrCodeInstance.update(options);
+      }
+    }
+
+    function downloadQR() {
+      if (!qrCodeInstance) return;
+      const text = document.getElementById('qrInput').value.trim().slice(0, 20).replace(/[^a-zA-Z0-9]/g, '_') || 'qrcode';
+      qrCodeInstance.download({ name: `palmtools_qr_${text}`, extension: "png" });
+    }
+
+    async function copyQR(btnElement) {
+      if (!qrCodeInstance) return;
+      try {
+        const canvas = document.querySelector('#qrCanvasWrap canvas');
+        if (!canvas) throw new Error("Canvas not found");
+        
+        canvas.toBlob(async (blob) => {
+          try {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            const origHTML = btnElement.innerHTML;
+            btnElement.innerHTML = '✓ Copied!';
+            setTimeout(() => btnElement.innerHTML = origHTML, 2000);
+          } catch (e) {
+            alert('Your browser does not support copying images to the clipboard. Please use the Download button instead.');
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
       color: var(--orange);
     }
     .error-correction-row {

@@ -1,801 +1,1158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Text to PDF — PALMTOOLS</title>
-  
-  <link rel="stylesheet" href="../shared.css"/>
-  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Text to PDF — Converter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ============ CSS VARIABLES ============ */
+:root {
+  --orange: #F97316;
+  --amber: #F59E0B;
+  --orange-dark: #EA580C;
+  --orange-glow: rgba(249,115,22,0.12);
+  --amber-glow: rgba(245,158,11,0.1);
+  --bg: #FEFCF8;
+  --bg-2: #FFF7ED;
+  --surface: #FFFFFF;
+  --surface-2: #FFF7ED;
+  --border: #E2760A;
+  --border-subtle: #D1C5BB;
+  --text: #1C1917;
+  --text-muted: #78716C;
+  --text-faint: #A8A29E;
+  --shadow: 0 2px 16px rgba(249,115,22,0.08);
+  --shadow-hover: 0 8px 40px rgba(249,115,22,0.22);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0C0A09;
+    --bg-2: #111110;
+    --surface: #1C1917;
+    --surface-2: #292524;
+    --border: #78716C;
+    --border-subtle: #44403C;
+    --text: #FAFAF9;
+    --text-muted: #A8A29E;
+    --text-faint: #78716C;
+    --shadow: 0 2px 16px rgba(0,0,0,0.5);
+    --shadow-hover: 0 8px 40px rgba(249,115,22,0.25);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
 
-  <style>
-    /* ── THEME SELECTOR ── */
-    .theme-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-    }
-    @media (max-width: 580px) { .theme-grid { grid-template-columns: repeat(3, 1fr); } }
+/* ============ PAGE LAYOUT ============ */
+.page-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+.tool-header { margin-bottom: 28px; }
+.tool-icon-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 54px; height: 54px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--orange), var(--amber));
+  font-size: 26px; margin-bottom: 14px;
+  box-shadow: 0 4px 20px rgba(249,115,22,0.35);
+}
+.tool-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(24px, 4vw, 36px);
+  font-weight: 800; color: var(--text);
+  margin-bottom: 5px; line-height: 1.1;
+}
+.tool-title .accent {
+  background: linear-gradient(135deg, var(--orange), var(--amber));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.tool-subtitle { font-size: 14px; color: var(--text-muted); }
 
-    .theme-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 10px 12px;
-      border-radius: 16px;
-      border: 2px solid var(--border-subtle);
-      background: var(--bg-2);
-      cursor: pointer;
-      transition: all 0.22s ease;
-    }
-    .theme-card:hover { border-color: var(--orange); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-    .theme-card.active { border-color: var(--orange); background: var(--orange-glow); box-shadow: 0 0 0 3px var(--orange-glow); }
-    .theme-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: 'DM Sans', sans-serif; }
-    .theme-card.active .theme-label { color: var(--orange); }
+/* ============ MAIN GRID ============ */
+.editor-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .editor-layout { grid-template-columns: 1fr; }
+}
 
-    .theme-preview {
-      width: 100%;
-      aspect-ratio: 0.707;
-      border-radius: 6px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      padding: 7px 6px;
-      gap: 3px;
-    }
-    .tp-line { height: 3px; border-radius: 2px; background: #d1d5db; flex-shrink: 0; }
-    .tp-line.h { height: 5px; background: #9ca3af; width: 70%; }
-    .tp-line.s { width: 55%; }
-    .tp-line.xs { width: 40%; }
+/* ============ CARDS ============ */
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.07);
+}
+.card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700;
+  color: var(--text); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.card-title::before {
+  content: ''; display: block;
+  width: 3px; height: 14px;
+  background: linear-gradient(180deg, var(--orange), var(--amber));
+  border-radius: 2px;
+}
 
-    .tp-minimal { background: #fff; border: 1px solid #e5e7eb; }
-    .tp-minimal .tp-line.h { background: #111; }
+/* ============ TOOLBAR ============ */
+.toolbar {
+  display: flex; flex-wrap: wrap;
+  gap: 3px; padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 14px 14px 0 0;
+  border-bottom: none;
+  align-items: center;
+}
+.tb-sep {
+  width: 1px; height: 22px;
+  background: var(--border-subtle);
+  margin: 0 4px; flex-shrink: 0;
+}
+.tb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.tb-btn:hover { background: var(--surface); border-color: var(--border-subtle); color: var(--text); }
+.tb-btn.active { background: var(--orange-glow); border-color: rgba(249,115,22,0.3); color: var(--orange); }
+.tb-btn svg { width: 15px; height: 15px; pointer-events: none; }
+.tb-select {
+  height: 32px; padding: 0 28px 0 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-subtle);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color 0.15s;
+}
+.tb-select:focus { border-color: var(--orange); }
+.tb-color {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-subtle);
+  padding: 3px;
+  cursor: pointer;
+  background: var(--surface);
+}
 
-    .tp-corporate { background: #fff; border: 1px solid #e5e7eb; }
-    .tp-corp-bar { height: 12px; background: #1e3a5f; border-radius: 3px 3px 0 0; margin: -7px -6px 5px; flex-shrink: 0; }
-    .tp-corporate .tp-line.h { background: #1e3a5f; }
+/* ============ EDITOR ============ */
+.editor-outer {
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 0 0 14px 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+#editor {
+  min-height: 540px;
+  padding: 32px 36px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text);
+  outline: none;
+  background: var(--surface);
+}
+#editor:empty::before {
+  content: 'Start typing your document here...';
+  color: var(--text-faint);
+  pointer-events: none;
+}
+#editor h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; line-height: 1.2; margin: 20px 0 12px; }
+#editor h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; margin: 16px 0 10px; }
+#editor h3 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; line-height: 1.3; margin: 12px 0 8px; }
+#editor p { margin-bottom: 10px; }
+#editor ul, #editor ol { padding-left: 24px; margin-bottom: 10px; }
+#editor blockquote {
+  border-left: 4px solid var(--orange);
+  padding: 12px 18px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  background: var(--bg-2);
+  border-radius: 0 10px 10px 0;
+  font-style: italic;
+}
+#editor hr { border: none; border-top: 2px solid var(--border-subtle); margin: 20px 0; }
+#editor img { max-width: 100%; border-radius: 10px; display: block; margin: 12px 0; }
+#editor a { color: var(--orange); text-decoration: underline; }
+#editor table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+#editor td, #editor th {
+  border: 1px solid var(--border-subtle);
+  padding: 8px 12px; font-size: 14px;
+}
+#editor th { background: var(--bg-2); font-weight: 600; }
+.editor-footer {
+  padding: 8px 16px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--border-subtle);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.word-count { font-size: 12px; color: var(--text-faint); }
 
-    .tp-creative { background: #fff; border: 1px solid #e5e7eb; }
-    .tp-accent-bar { height: 4px; width: 32px; background: linear-gradient(90deg,#F97316,#F59E0B); border-radius: 2px; margin-bottom: 2px; flex-shrink: 0; }
-    .tp-creative .tp-line.h { background: #F97316; width: 80%; }
+/* ============ BUTTONS ============ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 12px 24px;
+  border-radius: 50px; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+  transition: all 0.22s ease; text-decoration: none; white-space: nowrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--orange), var(--amber));
+  color: #fff; box-shadow: 0 4px 20px rgba(249,115,22,0.3);
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(249,115,22,0.45); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--surface-2); color: var(--text);
+  border: 1.5px solid var(--border-subtle);
+}
+.btn-secondary:hover { border-color: var(--orange); color: var(--orange); }
+.btn-sm { padding: 8px 16px; font-size: 13px; }
+.btn-full { width: 100%; }
+.btn-icon { width: 36px; height: 36px; padding: 0; border-radius: 10px; }
 
-    .tp-academic { background: #fffef9; border: 1px solid #e5e7eb; }
-    .tp-acad-title { height: 5px; width: 75%; background: #444; border-radius: 1px; align-self: center; margin-bottom: 3px; flex-shrink: 0; }
-    .tp-acad-rule { height: 1px; background: #bbb; margin: 2px 0 3px; flex-shrink: 0; }
-    .tp-academic .tp-line { background: #999; }
+/* ============ FORM ELEMENTS ============ */
+.label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--text-faint); text-transform: uppercase;
+  letter-spacing: 0.07em; margin-bottom: 6px;
+}
+.input, select.input {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg-2); border: 1.5px solid var(--border-subtle);
+  border-radius: 10px; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; color: var(--text); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input:focus, select.input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-glow);
+}
+select.input {
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 36px;
+}
+.field { margin-bottom: 14px; }
+.row { display: flex; gap: 10px; }
+.col { flex: 1; }
 
-    .tp-dark { background: #0d1b2a; border: 1px solid #1e3a5f; }
-    .tp-dark .tp-line { background: rgba(255,255,255,0.13); }
-    .tp-dark .tp-line.h { background: rgba(249,115,22,0.7); }
+/* ============ TEMPLATES ============ */
+.template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tmpl-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; padding: 14px 8px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 12px; background: var(--bg-2);
+  cursor: pointer; transition: all 0.18s;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text-muted); font-size: 12px; font-weight: 500;
+}
+.tmpl-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-glow); }
+.tmpl-btn .tmpl-icon { font-size: 22px; }
+.tmpl-btn span { text-align: center; line-height: 1.3; }
 
-    /* ── TOGGLE SWITCH ── */
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-    }
-    .toggle-info strong { display: block; font-size: 15px; font-weight: 600; color: var(--text); }
-    .toggle-info span { font-size: 13px; color: var(--text-muted); }
-    .tog { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
-    .tog input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .tog-track {
-      position: absolute; inset: 0;
-      background: var(--border-subtle);
-      border-radius: 14px;
-      transition: background 0.22s;
-      cursor: pointer;
-    }
-    .tog-track::after {
-      content: '';
-      position: absolute; left: 3px; top: 3px;
-      width: 22px; height: 22px;
-      background: white; border-radius: 50%;
-      transition: transform 0.22s;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-    }
-    .tog input:checked + .tog-track { background: var(--orange); }
-    .tog input:checked + .tog-track::after { transform: translateX(20px); }
+/* ============ IMAGE THUMB GRID ============ */
+.img-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 8px; margin-top: 10px;
+}
+.img-thumb {
+  position: relative; border-radius: 8px; overflow: hidden;
+  aspect-ratio: 1; border: 1.5px solid var(--border-subtle);
+  background: var(--bg-2); cursor: pointer;
+  transition: border-color 0.15s;
+}
+.img-thumb:hover { border-color: var(--orange); }
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.img-thumb .rm-btn {
+  position: absolute; top: 3px; right: 3px;
+  width: 18px; height: 18px;
+  background: rgba(0,0,0,0.6); border: none;
+  border-radius: 50%; color: white; font-size: 11px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s; opacity: 0;
+}
+.img-thumb:hover .rm-btn { opacity: 1; }
+.img-thumb .rm-btn:hover { background: #dc2626; }
 
-    /* ── COLLAPSIBLE ── */
-    .collapsible { display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }
-    .collapsible.open { display: block; }
+/* ============ DROP ZONE (images) ============ */
+.drop-zone-mini {
+  border: 2px dashed var(--border-subtle);
+  border-radius: 12px; padding: 20px 16px;
+  text-align: center; cursor: pointer;
+  transition: all 0.2s; background: var(--bg-2);
+  position: relative;
+}
+.drop-zone-mini:hover, .drop-zone-mini.drag-over {
+  border-color: var(--orange); background: var(--orange-glow);
+}
+.drop-zone-mini input[type="file"] {
+  position: absolute; inset: 0; opacity: 0;
+  cursor: pointer; width: 100%; height: 100%;
+}
+.drop-zone-mini p { font-size: 12px; color: var(--text-faint); }
+.drop-zone-mini .dz-icon { font-size: 24px; margin-bottom: 6px; }
 
-    /* ── GRIDS ── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 480px) { .grid-2 { grid-template-columns: 1fr; } }
+/* ============ STATUS ============ */
+.status {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  margin-top: 12px; animation: fadeIn 0.3s ease;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status.info { background: var(--orange-glow); color: var(--orange); }
+.status.info .status-dot { background: var(--orange); }
+.status.success { background: rgba(34,197,94,0.1); color: #16a34a; }
+.status.success .status-dot { background: #16a34a; }
+.status.error { background: rgba(239,68,68,0.1); color: #dc2626; }
+.status.error .status-dot { background: #dc2626; }
 
-    /* ── SEGMENT BUTTONS ── */
-    .seg-group { display: flex; gap: 6px; }
-    .seg-btn {
-      flex: 1; padding: 10px 6px;
-      border-radius: 10px;
-      border: 1.5px solid var(--border-subtle);
-      background: var(--bg-2);
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 700;
-      text-align: center; text-transform: uppercase; letter-spacing: 0.05em;
-      transition: all 0.18s;
-    }
-    .seg-btn:hover { border-color: var(--orange); color: var(--orange); }
-    .seg-btn.active { border-color: var(--orange); background: var(--orange-glow); color: var(--orange); }
+/* ============ SPINNER ============ */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: white; border-radius: 50%;
+  animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── PAGE NUMBER FORMAT ── */
-    .pn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .pn-opt {
-      padding: 10px 12px; border-radius: 10px;
-      border: 1.5px solid var(--border-subtle);
-      background: var(--bg-2); color: var(--text-muted);
-      cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 600;
-      text-align: center; transition: all 0.18s;
-    }
-    .pn-opt:hover { border-color: var(--orange); color: var(--orange); }
-    .pn-opt.active { border-color: var(--orange); background: var(--orange-glow); color: var(--orange); }
+/* ============ PROGRESS ============ */
+.progress-wrap {
+  width: 100%; height: 6px;
+  background: var(--border-subtle); border-radius: 3px;
+  overflow: hidden; margin: 8px 0;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--amber));
+  border-radius: 3px; transition: width 0.4s ease;
+  position: relative; overflow: hidden;
+}
+.progress-bar::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
 
-    /* ── QUILL EDITOR ── */
-    .editor-wrapper { border-radius: 12px; overflow: hidden; margin-top: 8px; }
-    .ql-toolbar.ql-snow {
-      border: 1.5px solid var(--border-subtle); border-bottom: none;
-      border-radius: 12px 12px 0 0;
-      background: var(--surface-2); font-family: 'DM Sans', sans-serif; padding: 10px;
-    }
-    .ql-container.ql-snow {
-      border: 1.5px solid var(--border-subtle);
-      border-radius: 0 0 12px 12px;
-      background: var(--bg-2); font-family: 'DM Sans', sans-serif;
-      font-size: 15px; color: var(--text); min-height: 380px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .ql-container.ql-snow.focused { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-glow); }
-    .ql-editor { min-height: 380px; line-height: 1.75; padding: 24px; }
-    .ql-editor img { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; }
-    .ql-editor blockquote { border-left: 3px solid var(--orange); padding-left: 16px; color: var(--text-muted); }
+/* ============ DIVIDER ============ */
+.divider { border: none; border-top: 1px solid var(--border-subtle); margin: 16px 0; }
 
-    .ql-snow.ql-toolbar button:hover, .ql-snow .ql-toolbar button.ql-active,
-    .ql-snow.ql-toolbar .ql-picker-label:hover, .ql-snow .ql-toolbar .ql-picker-label.ql-active,
-    .ql-snow.ql-toolbar .ql-picker-item:hover, .ql-snow .ql-toolbar .ql-picker-item.ql-selected { color: var(--orange); }
-    .ql-snow.ql-toolbar button:hover .ql-stroke, .ql-snow .ql-toolbar button.ql-active .ql-stroke,
-    .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke { stroke: var(--orange); }
-    .ql-snow.ql-toolbar button:hover .ql-fill, .ql-snow .ql-toolbar button.ql-active .ql-fill { fill: var(--orange); }
+/* ============ BADGE ============ */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 50px;
+  font-size: 11px; font-weight: 600;
+  background: var(--orange-glow); color: var(--orange);
+  border: 1px solid rgba(249,115,22,0.2);
+}
 
-    .section-rule { border: none; border-top: 1px solid var(--border-subtle); margin: 18px 0; }
-  </style>
+/* ============ ANIMATIONS ============ */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.35s ease both; }
+
+/* ============ PAGE SETTINGS PREVIEW ============ */
+.page-preview-mini {
+  display: flex; align-items: center; justify-content: center;
+  background: white; border: 1.5px solid var(--border-subtle);
+  border-radius: 8px; aspect-ratio: 0.77;
+  max-width: 60px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: relative; overflow: hidden; flex-shrink: 0;
+}
+.page-preview-mini.landscape { aspect-ratio: 1.3; max-width: 80px; }
+.page-line {
+  position: absolute; left: 15%; right: 15%;
+  height: 2px; background: var(--border-subtle); border-radius: 1px;
+}
+
+/* ============ GENERATE BAR ============ */
+.gen-bar {
+  display: flex; align-items: center;
+  gap: 12px; flex-wrap: wrap; margin-top: 20px;
+}
+
+/* ============ MODAL ============ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+.modal {
+  background: var(--surface);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 20px; padding: 28px;
+  max-width: 420px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px; font-weight: 800;
+  margin-bottom: 16px;
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+/* ============ TABS ============ */
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab-btn {
+  padding: 7px 14px; border-radius: 8px;
+  border: 1.5px solid transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+  background: transparent; color: var(--text-muted);
+}
+.tab-btn.active {
+  background: var(--orange-glow);
+  border-color: rgba(249,115,22,0.3);
+  color: var(--orange);
+}
+.tab-btn:hover:not(.active) { background: var(--bg-2); color: var(--text); }
+
+/* ============ SCROLL ============ */
+.sidebar { max-height: calc(100vh - 140px); overflow-y: auto; position: sticky; top: 20px; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+</style>
 </head>
-
 <body>
-  <div class="tool-page">
 
-    <nav class="tool-nav">
-      <a class="back-btn" href="../index.html">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
-        Back to PALMTOOLS
-      </a>
-    </nav>
-
-    <header class="tool-header">
-      <div class="tool-icon-badge">📄</div>
-      <h1 class="tool-title">Text <span class="accent">to PDF</span></h1>
-      <p class="tool-subtitle">Write rich documents with formatting, images, headers, footers, cover pages, and page numbers — then export as a perfectly paginated PDF in any style.</p>
-    </header>
-
-    <div class="card">
-      <div class="card-title">Template</div>
-      <div class="theme-grid">
-
-        <button class="theme-card active" data-theme="minimal" onclick="selectTheme(this)">
-          <div class="theme-preview tp-minimal">
-            <div class="tp-line h"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line s"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line xs"></div>
-            <div class="tp-line"></div>
-          </div>
-          <span class="theme-label">Minimal</span>
-        </button>
-
-        <button class="theme-card" data-theme="corporate" onclick="selectTheme(this)">
-          <div class="theme-preview tp-corporate">
-            <div class="tp-corp-bar"></div>
-            <div class="tp-line h"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line s"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line xs"></div>
-          </div>
-          <span class="theme-label">Corporate</span>
-        </button>
-
-        <button class="theme-card" data-theme="creative" onclick="selectTheme(this)">
-          <div class="theme-preview tp-creative">
-            <div class="tp-accent-bar"></div>
-            <div class="tp-line h"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line s"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line xs"></div>
-          </div>
-          <span class="theme-label">Creative</span>
-        </button>
-
-        <button class="theme-card" data-theme="academic" onclick="selectTheme(this)">
-          <div class="theme-preview tp-academic">
-            <div class="tp-acad-title"></div>
-            <div class="tp-acad-rule"></div>
-            <div class="tp-line s"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line xs"></div>
-            <div class="tp-line"></div>
-          </div>
-          <span class="theme-label">Academic</span>
-        </button>
-
-        <button class="theme-card" data-theme="dark" onclick="selectTheme(this)">
-          <div class="theme-preview tp-dark">
-            <div class="tp-line h"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line s"></div>
-            <div class="tp-line"></div>
-            <div class="tp-line xs"></div>
-            <div class="tp-line"></div>
-          </div>
-          <span class="theme-label">Dark</span>
-        </button>
-
-      </div>
-    </div>
-
-    <div class="card">
-      <label class="toggle-row" for="coverToggle">
-        <div class="toggle-info">
-          <strong>Cover Page</strong>
-          <span>Add a styled title page before your content</span>
-        </div>
-        <div class="tog">
-          <input type="checkbox" id="coverToggle" onchange="document.getElementById('coverFields').classList.toggle('open',this.checked)">
-          <div class="tog-track"></div>
-        </div>
-      </label>
-      <div class="collapsible" id="coverFields">
-        <div class="grid-2">
-          <div class="field">
-            <label class="label">Document Title</label>
-            <input class="input" type="text" id="coverTitle" placeholder="My Document Title"/>
-          </div>
-          <div class="field">
-            <label class="label">Subtitle</label>
-            <input class="input" type="text" id="coverSubtitle" placeholder="Optional tagline or subtitle"/>
-          </div>
-          <div class="field">
-            <label class="label">Author</label>
-            <input class="input" type="text" id="coverAuthor" placeholder="Your name or organization"/>
-          </div>
-          <div class="field">
-            <label class="label">Date</label>
-            <input class="input" type="text" id="coverDate" placeholder="e.g. March 2026"/>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Document Content</div>
-      <div class="field">
-        <label class="label">Filename (saved as filename.pdf)</label>
-        <input class="input" type="text" id="docFilename" placeholder="my_document"/>
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label class="label">Body</label>
-        <div class="editor-wrapper">
-          <div id="editor-container"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Page Settings</div>
-      <div class="grid-2">
-        <div class="field">
-          <label class="label">Page Size</label>
-          <select class="input" id="pageSize">
-            <option value="a4" selected>A4 (210 × 297mm)</option>
-            <option value="letter">Letter (216 × 279mm)</option>
-            <option value="a3">A3 (297 × 420mm)</option>
-            <option value="legal">Legal (216 × 356mm)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Orientation</label>
-          <select class="input" id="orientation">
-            <option value="portrait" selected>Portrait</option>
-            <option value="landscape">Landscape</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Margin</label>
-          <select class="input" id="margin">
-            <option value="8">Narrow (8mm)</option>
-            <option value="15">Compact (15mm)</option>
-            <option value="20" selected>Normal (20mm)</option>
-            <option value="28">Wide (28mm)</option>
-            <option value="36">Extra Wide (36mm)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Font Family</label>
-          <select class="input" id="fontFamily">
-            <option value="'DM Sans',Helvetica,sans-serif" selected>DM Sans (Default)</option>
-            <option value="Georgia,'Times New Roman',serif">Georgia (Serif)</option>
-            <option value="'Times New Roman',Times,serif">Times New Roman</option>
-            <option value="'Courier New',Courier,monospace">Courier New (Mono)</option>
-            <option value="Arial,Helvetica,sans-serif">Arial</option>
-            <option value="Verdana,Geneva,sans-serif">Verdana</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Body Font Size</label>
-          <select class="input" id="bodyFontSize">
-            <option value="11px">Small (11px)</option>
-            <option value="13px">Normal (13px)</option>
-            <option value="15px" selected>Medium (15px)</option>
-            <option value="17px">Large (17px)</option>
-            <option value="19px">Extra Large (19px)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Line Spacing</label>
-          <select class="input" id="lineSpacing">
-            <option value="1.4">Compact (1.4)</option>
-            <option value="1.6">Normal (1.6)</option>
-            <option value="1.75" selected>Relaxed (1.75)</option>
-            <option value="2.0">Double (2.0)</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Header & Footer</div>
-
-      <div class="field">
-        <label class="label">Header Text</label>
-        <input class="input" type="text" id="headerText" placeholder="e.g. Company Name — Confidential"/>
-      </div>
-      <div class="field">
-        <label class="label">Header Alignment</label>
-        <div class="seg-group" id="headerAlignBtns">
-          <button class="seg-btn active" onclick="setSegGroup('headerAlignBtns',this); headerAlign='left';">Left</button>
-          <button class="seg-btn"        onclick="setSegGroup('headerAlignBtns',this); headerAlign='center';">Center</button>
-          <button class="seg-btn"        onclick="setSegGroup('headerAlignBtns',this); headerAlign='right';">Right</button>
-        </div>
-      </div>
-
-      <hr class="section-rule">
-
-      <div class="field">
-        <label class="label">Footer Text</label>
-        <input class="input" type="text" id="footerText" placeholder="e.g. © 2026 PALMTOOLS"/>
-      </div>
-
-      <hr class="section-rule">
-
-      <label class="toggle-row" for="pageNumToggle" style="margin-bottom:14px;">
-        <div class="toggle-info">
-          <strong>Page Numbers</strong>
-          <span>Automatically number each page</span>
-        </div>
-        <div class="tog">
-          <input type="checkbox" id="pageNumToggle" checked onchange="document.getElementById('pnOptions').classList.toggle('open',this.checked)">
-          <div class="tog-track"></div>
-        </div>
-      </label>
-
-      <div class="collapsible open" id="pnOptions">
-        <div class="field">
-          <label class="label">Format</label>
-          <div class="pn-grid">
-            <button class="pn-opt active" data-fmt="Page {n} of {t}" onclick="setPNFmt(this)">Page 1 of 5</button>
-            <button class="pn-opt"        data-fmt="Page {n}"        onclick="setPNFmt(this)">Page 1</button>
-            <button class="pn-opt"        data-fmt="{n} / {t}"       onclick="setPNFmt(this)">1 / 5</button>
-            <button class="pn-opt"        data-fmt="{n}"             onclick="setPNFmt(this)">1</button>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label class="label">Position</label>
-          <div class="seg-group" id="pnPosBtns">
-            <button class="seg-btn"        onclick="setSegGroup('pnPosBtns',this); pnPos='left';">Left</button>
-            <button class="seg-btn active" onclick="setSegGroup('pnPosBtns',this); pnPos='center';">Center</button>
-            <button class="seg-btn"        onclick="setSegGroup('pnPosBtns',this); pnPos='right';">Right</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Document Preview</div>
-      <div class="actions">
-        <button class="btn btn-secondary" id="previewBtn" onclick="runPDF('preview')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          Generate Preview
-        </button>
-      </div>
-      <div id="previewWrapper" style="display:none;">
-        </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Export</div>
-      <div id="exportStatus" style="display:none;"></div>
-      <div class="actions">
-        <button class="btn btn-primary" id="exportBtn" onclick="runPDF('save')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download PDF
-        </button>
-        <button class="btn btn-ghost" onclick="clearAll()">Clear All</button>
-      </div>
-    </div>
-
+<div class="page-wrap">
+  <!-- Header -->
+  <div class="tool-header fade-in">
+    <div class="tool-icon-badge">📄</div>
+    <h1 class="tool-title">Text to <span class="accent">PDF</span></h1>
+    <p class="tool-subtitle">Rich text editor with templates, images, and full page control</p>
   </div>
 
-  <script>
-  // ── STATE
-  let currentTheme = 'minimal';
-  let headerAlign  = 'left';
-  let pnFormat     = 'Page {n} of {t}';
-  let pnPos        = 'center';
+  <div class="editor-layout">
+    <!-- LEFT: Editor -->
+    <div>
+      <!-- Toolbar -->
+      <div class="toolbar" id="toolbar">
+        <!-- History -->
+        <button class="tb-btn" title="Undo (Ctrl+Z)" onclick="document.execCommand('undo')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        </button>
+        <button class="tb-btn" title="Redo (Ctrl+Y)" onclick="document.execCommand('redo')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+        </button>
 
-  // ── THEMES
-  const THEMES = {
-    minimal: {
-      pageBg: '#ffffff', textColor: '#111111', headColor: '#111111', bodyExtra: '',
-      cover: d => `
-        <div style="height:1122px;display:flex;flex-direction:column;justify-content:center;align-items:center;
-                    text-align:center;padding:80px;background:#ffffff;page-break-after:always;">
-          <div style="width:48px;height:3px;background:#111;border-radius:2px;margin-bottom:48px;"></div>
-          <h1 style="font-size:54px;font-weight:700;color:#111;line-height:1.05;margin-bottom:18px;">${d.title}</h1>
-          ${d.subtitle ? `<p style="font-size:20px;color:#666;margin-bottom:48px;">${d.subtitle}</p>` : '<div style="height:48px;"></div>'}
-          <div style="width:48px;height:3px;background:#111;border-radius:2px;margin-bottom:48px;"></div>
-          ${d.author ? `<p style="font-size:16px;font-weight:600;color:#333;">${d.author}</p>` : ''}
-          ${d.date   ? `<p style="font-size:13px;color:#999;margin-top:8px;">${d.date}</p>` : ''}
-        </div>`
-    },
-    corporate: {
-      pageBg: '#ffffff', textColor: '#2d3748', headColor: '#1e3a5f', bodyExtra: '',
-      cover: d => `
-        <div style="height:1122px;display:flex;flex-direction:column;background:#1e3a5f;page-break-after:always;overflow:hidden;">
-          <div style="height:6px;background:linear-gradient(90deg,#F97316,#F59E0B);flex-shrink:0;"></div>
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px;">
-            <p style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:32px;">Document</p>
-            <h1 style="font-size:58px;font-weight:700;color:#fff;line-height:1.0;margin-bottom:22px;">${d.title}</h1>
-            ${d.subtitle ? `<p style="font-size:20px;color:rgba(255,255,255,0.6);border-left:4px solid #F97316;padding-left:20px;">${d.subtitle}</p>` : ''}
+        <div class="tb-sep"></div>
+
+        <!-- Font family -->
+        <select class="tb-select" id="fontFamily" title="Font Family" onchange="execFmt('fontName', this.value)" style="width:110px">
+          <option value="DM Sans">DM Sans</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Arial">Arial</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Trebuchet MS">Trebuchet MS</option>
+        </select>
+
+        <!-- Font size -->
+        <select class="tb-select" id="fontSize" title="Font Size" onchange="setFontSize(this.value)" style="width:58px">
+          <option value="1">8</option>
+          <option value="2">10</option>
+          <option value="3" selected>12</option>
+          <option value="4">14</option>
+          <option value="5">18</option>
+          <option value="6">24</option>
+          <option value="7">36</option>
+        </select>
+
+        <!-- Heading -->
+        <select class="tb-select" id="blockFmt" title="Block Format" onchange="execFmt('formatBlock', this.value)" style="width:84px">
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+          <option value="pre">Code</option>
+        </select>
+
+        <div class="tb-sep"></div>
+
+        <!-- Text style -->
+        <button class="tb-btn" id="btn-bold" title="Bold (Ctrl+B)" onclick="execFmt('bold')"><b>B</b></button>
+        <button class="tb-btn" id="btn-italic" title="Italic (Ctrl+I)" onclick="execFmt('italic')"><i>I</i></button>
+        <button class="tb-btn" id="btn-underline" title="Underline (Ctrl+U)" onclick="execFmt('underline')"><u>U</u></button>
+        <button class="tb-btn" id="btn-strikethrough" title="Strikethrough" onclick="execFmt('strikethrough')"><s>S</s></button>
+
+        <div class="tb-sep"></div>
+
+        <!-- Align -->
+        <button class="tb-btn" id="btn-justifyLeft" title="Align Left" onclick="execFmt('justifyLeft')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" id="btn-justifyCenter" title="Center" onclick="execFmt('justifyCenter')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" id="btn-justifyRight" title="Align Right" onclick="execFmt('justifyRight')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" id="btn-justifyFull" title="Justify" onclick="execFmt('justifyFull')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <div class="tb-sep"></div>
+
+        <!-- Lists -->
+        <button class="tb-btn" id="btn-insertUnorderedList" title="Bullet List" onclick="execFmt('insertUnorderedList')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><line x1="8" y1="6" x2="21" y2="6"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><line x1="8" y1="12" x2="21" y2="12"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" id="btn-insertOrderedList" title="Numbered List" onclick="execFmt('insertOrderedList')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><text x="2" y="9" font-size="8" fill="currentColor" stroke="none">1.</text><text x="2" y="15" font-size="8" fill="currentColor" stroke="none">2.</text><text x="2" y="21" font-size="8" fill="currentColor" stroke="none">3.</text><line x1="11" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" title="Indent" onclick="execFmt('indent')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="3 12 7 12"/><polyline points="7 9 11 12 7 15"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" title="Outdent" onclick="execFmt('outdent')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="11 12 7 12"/><polyline points="11 9 7 12 11 15"/><line x1="3" y1="12" x2="3" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <div class="tb-sep"></div>
+
+        <!-- Colors -->
+        <div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+          <span style="font-size:9px;color:var(--text-faint);font-weight:600;">TEXT</span>
+          <input type="color" class="tb-color" id="textColor" title="Text Color" value="#1C1917" oninput="execFmt('foreColor', this.value)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+          <span style="font-size:9px;color:var(--text-faint);font-weight:600;">HL</span>
+          <input type="color" class="tb-color" id="hlColor" title="Highlight" value="#FFF7ED" oninput="execFmt('hiliteColor', this.value)">
+        </div>
+
+        <div class="tb-sep"></div>
+
+        <!-- Insert -->
+        <button class="tb-btn" title="Insert Link" onclick="insertLink()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <button class="tb-btn" title="Insert Table" onclick="insertTable()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+        </button>
+        <button class="tb-btn" title="Horizontal Rule" onclick="execFmt('insertHorizontalRule')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+        </button>
+        <button class="tb-btn" title="Clear Formatting" onclick="execFmt('removeFormat')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m7 21-4.3-4.3c-1-1-.8-2.7.5-3.4l9.6-5.7 7.3 7.3-9.2 5.7c-.6.4-1.4.5-2 .2z"/><path d="m11 11 4-4"/><line x1="17" y1="21" x2="21" y2="21"/></svg>
+        </button>
+      </div>
+
+      <!-- Editor area -->
+      <div class="editor-outer">
+        <div id="editor" contenteditable="true" spellcheck="true" oninput="updateWordCount()"></div>
+        <div class="editor-footer">
+          <span class="word-count" id="word-count">0 words · 0 characters</span>
+          <span class="badge" id="page-size-badge">A4 · Portrait</span>
+        </div>
+      </div>
+
+      <!-- Generate bar -->
+      <div class="gen-bar">
+        <button class="btn btn-primary" id="gen-btn" onclick="generatePDF()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export PDF
+        </button>
+        <button class="btn btn-secondary" onclick="clearEditor()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/><path d="M9 6V4h6v2"/></svg>
+          Clear
+        </button>
+        <button class="btn btn-secondary" onclick="printDoc()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+      </div>
+
+      <!-- Status -->
+      <div id="status-area"></div>
+    </div>
+
+    <!-- RIGHT: Sidebar -->
+    <div class="sidebar">
+
+      <!-- Templates -->
+      <div class="card">
+        <div class="card-title">Templates</div>
+        <div class="template-grid">
+          <button class="tmpl-btn" onclick="loadTemplate('blank')">
+            <span class="tmpl-icon">📝</span><span>Blank</span>
+          </button>
+          <button class="tmpl-btn" onclick="loadTemplate('letter')">
+            <span class="tmpl-icon">✉️</span><span>Letter</span>
+          </button>
+          <button class="tmpl-btn" onclick="loadTemplate('invoice')">
+            <span class="tmpl-icon">🧾</span><span>Invoice</span>
+          </button>
+          <button class="tmpl-btn" onclick="loadTemplate('report')">
+            <span class="tmpl-icon">📊</span><span>Report</span>
+          </button>
+          <button class="tmpl-btn" onclick="loadTemplate('resume')">
+            <span class="tmpl-icon">👤</span><span>Resume</span>
+          </button>
+          <button class="tmpl-btn" onclick="loadTemplate('contract')">
+            <span class="tmpl-icon">📋</span><span>Contract</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Page Settings -->
+      <div class="card">
+        <div class="card-title">Page Settings</div>
+
+        <div class="field">
+          <label class="label">Paper Size</label>
+          <select class="input" id="paperSize" onchange="updatePageBadge()">
+            <option value="a4">A4 (210 × 297 mm)</option>
+            <option value="letter">Letter (8.5 × 11 in)</option>
+            <option value="legal">Legal (8.5 × 14 in)</option>
+            <option value="a3">A3 (297 × 420 mm)</option>
+            <option value="a5">A5 (148 × 210 mm)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label">Orientation</label>
+          <div class="row">
+            <button class="btn btn-secondary btn-sm col" id="orient-portrait" onclick="setOrientation('portrait')" style="border-color:var(--orange);color:var(--orange)">
+              ▯ Portrait
+            </button>
+            <button class="btn btn-secondary btn-sm col" id="orient-landscape" onclick="setOrientation('landscape')">
+              ▭ Landscape
+            </button>
           </div>
-          <div style="padding:44px 80px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:flex-end;">
-            ${d.author ? `<p style="font-size:15px;font-weight:600;color:#fff;">${d.author}</p>` : '<span></span>'}
-            ${d.date   ? `<p style="font-size:13px;color:rgba(255,255,255,0.45);">${d.date}</p>` : ''}
-          </div>
-        </div>`
-    },
-    creative: {
-      pageBg: '#ffffff', textColor: '#1a1a1a', headColor: '#F97316', bodyExtra: '',
-      cover: d => `
-        <div style="height:1122px;display:flex;flex-direction:column;background:#fff;position:relative;overflow:hidden;page-break-after:always;">
-          <div style="position:absolute;top:0;right:0;width:360px;height:360px;background:linear-gradient(135deg,#F97316,#F59E0B);border-radius:0 0 0 100%;opacity:0.12;"></div>
-          <div style="position:absolute;bottom:0;left:0;width:280px;height:280px;background:linear-gradient(135deg,#F97316,#F59E0B);border-radius:0 100% 0 0;opacity:0.08;"></div>
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:90px;position:relative;">
-            <div style="height:5px;width:72px;background:linear-gradient(90deg,#F97316,#F59E0B);border-radius:3px;margin-bottom:40px;"></div>
-            <h1 style="font-size:62px;font-weight:800;color:#1a1a1a;line-height:0.97;margin-bottom:22px;">${d.title}</h1>
-            ${d.subtitle ? `<p style="font-size:22px;color:#F97316;font-weight:500;">${d.subtitle}</p>` : ''}
-          </div>
-          <div style="padding:44px 90px;display:flex;justify-content:space-between;align-items:center;position:relative;">
-            ${d.author ? `<p style="font-size:15px;font-weight:700;color:#1a1a1a;">${d.author}</p>` : '<span></span>'}
-            ${d.date   ? `<p style="font-size:13px;color:#aaa;">${d.date}</p>` : ''}
-          </div>
-        </div>`
-    },
-    academic: {
-      pageBg: '#fffef9', textColor: '#1a1a1a', headColor: '#1a1a1a',
-      bodyExtra: "font-family:'Times New Roman',Georgia,serif;",
-      cover: d => `
-        <div style="height:1122px;display:flex;flex-direction:column;justify-content:space-between;
-                    background:#fffef9;padding:100px 80px;page-break-after:always;">
-          <div style="text-align:center;padding-bottom:24px;border-bottom:2px solid #333;">
-            <p style="font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#666;font-family:'Times New Roman',serif;">${d.date || ''}</p>
-          </div>
-          <div style="text-align:center;padding:60px 0;">
-            <h1 style="font-size:42px;font-weight:700;color:#111;font-family:'Times New Roman',serif;line-height:1.25;margin-bottom:28px;">${d.title}</h1>
-            ${d.subtitle ? `<p style="font-size:18px;color:#555;font-style:italic;font-family:'Times New Roman',serif;">${d.subtitle}</p>` : ''}
-          </div>
-          <div style="text-align:center;padding-top:24px;border-top:1px solid #555;">
-            ${d.author ? `<p style="font-size:16px;font-weight:600;color:#333;font-family:'Times New Roman',serif;">${d.author}</p>` : ''}
-          </div>
-        </div>`
-    },
-    dark: {
-      pageBg: '#16213e', textColor: '#d8e2f0', headColor: '#F97316', bodyExtra: '',
-      cover: d => `
-        <div style="height:1122px;display:flex;flex-direction:column;justify-content:center;
-                    background:#0d1b2a;padding:80px;position:relative;overflow:hidden;page-break-after:always;">
-          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 25% 55%,rgba(249,115,22,0.08),transparent 65%);"></div>
-          <div style="position:relative;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:52px;">
-              <div style="width:40px;height:3px;background:linear-gradient(90deg,#F97316,#F59E0B);border-radius:2px;"></div>
-              <div style="width:14px;height:3px;background:rgba(249,115,22,0.28);border-radius:2px;"></div>
+        </div>
+
+        <div class="field">
+          <label class="label">Margins (mm)</label>
+          <div class="row">
+            <div class="col">
+              <input type="number" class="input" id="m-top" value="20" min="0" max="60" placeholder="Top">
             </div>
-            <h1 style="font-size:58px;font-weight:700;color:#fff;line-height:1.02;margin-bottom:20px;">${d.title}</h1>
-            ${d.subtitle ? `<p style="font-size:20px;color:rgba(255,255,255,0.5);margin-bottom:56px;">${d.subtitle}</p>` : '<div style="height:56px;"></div>'}
-            <div style="display:flex;gap:28px;align-items:center;">
-              ${d.author ? `<p style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.7);">${d.author}</p>` : ''}
-              ${d.date   ? `<p style="font-size:13px;color:rgba(255,255,255,0.3);">${d.date}</p>` : ''}
+            <div class="col">
+              <input type="number" class="input" id="m-bottom" value="20" min="0" max="60" placeholder="Btm">
             </div>
           </div>
-        </div>`
-    }
-  };
+          <div class="row" style="margin-top:8px">
+            <div class="col">
+              <input type="number" class="input" id="m-left" value="20" min="0" max="60" placeholder="Left">
+            </div>
+            <div class="col">
+              <input type="number" class="input" id="m-right" value="20" min="0" max="60" placeholder="Right">
+            </div>
+          </div>
+        </div>
 
-  // ── QUILL INIT
-  const icons = Quill.import('ui/icons');
-  icons['undo'] = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="6 10 4 12 2 10 6 10"></polygon><path class="ql-stroke" d="M8.09,13.91A4.6,4.6,0,0,0,9,14,5,5,0,1,0,4,9"></path></svg>';
-  icons['redo'] = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="12 10 14 12 16 10 12 10"></polygon><path class="ql-stroke" d="M9.91,13.91A4.6,4.6,0,0,1,9,14a5,5,0,1,1,5-5"></path></svg>';
+        <div class="field">
+          <label class="label">Document Title</label>
+          <input type="text" class="input" id="doc-title" placeholder="My Document" value="My Document">
+        </div>
 
-  const quill = new Quill('#editor-container', {
-    modules: {
-      toolbar: {
-        container: [
-          ['undo','redo'],
-          [{ header: [1,2,3,4,false] }],
-          ['bold','italic','underline','strike'],
-          [{ color:[] }, { background:[] }],
-          [{ align:[] }],
-          [{ list:'ordered' }, { list:'bullet' }, { indent:'-1' }, { indent:'+1' }],
-          ['blockquote','code-block'],
-          ['link','image'],
-          ['clean']
-        ],
-        handlers: {
-          undo: function(){ this.quill.history.undo(); },
-          redo: function(){ this.quill.history.redo(); }
-        }
-      },
-      history: { delay: 1000, maxStack: 100, userOnly: true }
-    },
-    theme: 'snow',
-    placeholder: 'Start writing your document… use the toolbar to add headings, formatting, images, links, and more.'
+        <div class="field">
+          <label class="label">Header Text (optional)</label>
+          <input type="text" class="input" id="header-text" placeholder="Company name, date…">
+        </div>
+
+        <div class="field">
+          <label class="label">Footer Text (optional)</label>
+          <input type="text" class="input" id="footer-text" placeholder="Page {n} | Confidential">
+        </div>
+
+        <div class="field" style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="page-nums" checked style="accent-color:var(--orange);width:16px;height:16px;cursor:pointer">
+          <label for="page-nums" style="font-size:13px;color:var(--text-muted);cursor:pointer">Show page numbers</label>
+        </div>
+
+        <div class="field" style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="watermark-cb" style="accent-color:var(--orange);width:16px;height:16px;cursor:pointer" onchange="toggleWatermark()">
+          <label for="watermark-cb" style="font-size:13px;color:var(--text-muted);cursor:pointer">Add watermark</label>
+        </div>
+        <div id="watermark-field" style="display:none;margin-top:8px">
+          <input type="text" class="input" id="watermark-text" placeholder="DRAFT, CONFIDENTIAL…" value="DRAFT">
+        </div>
+      </div>
+
+      <!-- Images -->
+      <div class="card">
+        <div class="card-title">Images</div>
+        <div class="drop-zone-mini" id="img-drop" ondrop="handleImgDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+          <input type="file" accept="image/*" multiple onchange="handleImgFiles(this.files)">
+          <div class="dz-icon">🖼️</div>
+          <p><span style="color:var(--orange);font-weight:600">Browse</span> or drag images here</p>
+        </div>
+        <div class="img-grid" id="img-gallery"></div>
+        <p style="font-size:11px;color:var(--text-faint);margin-top:8px">Click an image to insert it at cursor position</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Link Modal -->
+<div class="modal-overlay" id="link-modal" style="display:none" onclick="if(event.target===this)closeModal('link-modal')">
+  <div class="modal">
+    <h3>Insert Link</h3>
+    <div class="field">
+      <label class="label">Display Text</label>
+      <input type="text" class="input" id="link-text" placeholder="Click here">
+    </div>
+    <div class="field">
+      <label class="label">URL</label>
+      <input type="url" class="input" id="link-url" placeholder="https://example.com">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="confirmLink()">Insert</button>
+      <button class="btn btn-secondary" onclick="closeModal('link-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table Modal -->
+<div class="modal-overlay" id="table-modal" style="display:none" onclick="if(event.target===this)closeModal('table-modal')">
+  <div class="modal">
+    <h3>Insert Table</h3>
+    <div class="row">
+      <div class="col field">
+        <label class="label">Rows</label>
+        <input type="number" class="input" id="tbl-rows" value="3" min="1" max="20">
+      </div>
+      <div class="col field">
+        <label class="label">Columns</label>
+        <input type="number" class="input" id="tbl-cols" value="3" min="1" max="10">
+      </div>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="tbl-header" checked style="accent-color:var(--orange);width:16px;height:16px;cursor:pointer">
+      <label for="tbl-header" style="font-size:13px;color:var(--text-muted)">Header row</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="confirmTable()">Insert</button>
+      <button class="btn btn-secondary" onclick="closeModal('table-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden render container for PDF -->
+<div id="pdf-render" style="position:fixed;left:-9999px;top:0;background:white;font-family:'DM Sans',sans-serif;"></div>
+
+<script>
+/* ============ STATE ============ */
+let orientation = 'portrait';
+let savedRange = null;
+const imgLibrary = []; // { url, name }
+
+/* ============ TOOLBAR ============ */
+function execFmt(cmd, val) {
+  document.getElementById('editor').focus();
+  document.execCommand(cmd, false, val || null);
+  updateToolbarState();
+}
+
+function setFontSize(size) {
+  document.getElementById('editor').focus();
+  document.execCommand('fontSize', false, size);
+}
+
+function updateToolbarState() {
+  const cmds = ['bold','italic','underline','strikethrough','justifyLeft','justifyCenter','justifyRight','justifyFull','insertUnorderedList','insertOrderedList'];
+  cmds.forEach(cmd => {
+    const btn = document.getElementById('btn-'+cmd);
+    if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
   });
+}
 
-  quill.root.addEventListener('focus', () => document.querySelector('.ql-container').classList.add('focused'));
-  quill.root.addEventListener('blur',  () => document.querySelector('.ql-container').classList.remove('focused'));
+document.getElementById('editor').addEventListener('keyup', updateToolbarState);
+document.getElementById('editor').addEventListener('mouseup', updateToolbarState);
+document.getElementById('editor').addEventListener('selectionchange', updateToolbarState);
 
-  // ── UI HELPERS
-  function selectTheme(btn) {
-    document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    currentTheme = btn.dataset.theme;
-  }
+/* ============ WORD COUNT ============ */
+function updateWordCount() {
+  const editor = document.getElementById('editor');
+  const text = editor.innerText || '';
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const chars = text.length;
+  document.getElementById('word-count').textContent = `${words} word${words!==1?'s':''} · ${chars} character${chars!==1?'s':''}`;
+}
 
-  function setSegGroup(groupId, btn) {
-    document.querySelectorAll('#' + groupId + ' .seg-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  }
+/* ============ ORIENTATION ============ */
+function setOrientation(dir) {
+  orientation = dir;
+  document.getElementById('orient-portrait').style.cssText = dir==='portrait' ? 'border-color:var(--orange);color:var(--orange)' : '';
+  document.getElementById('orient-landscape').style.cssText = dir==='landscape' ? 'border-color:var(--orange);color:var(--orange)' : '';
+  updatePageBadge();
+}
 
-  function setPNFmt(btn) {
-    document.querySelectorAll('.pn-opt').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    pnFormat = btn.dataset.fmt;
-  }
+function updatePageBadge() {
+  const size = document.getElementById('paperSize').value.toUpperCase();
+  const orient = orientation.charAt(0).toUpperCase() + orientation.slice(1);
+  document.getElementById('page-size-badge').textContent = `${size} · ${orient}`;
+}
 
-  function clearAll() {
-    if (!confirm('Clear everything and start fresh?')) return;
-    quill.setContents([]);
-    ['docFilename','coverTitle','coverSubtitle','coverAuthor','coverDate','headerText','footerText']
-      .forEach(id => document.getElementById(id).value = '');
-    document.getElementById('previewWrapper').style.display = 'none';
-    document.getElementById('exportStatus').style.display  = 'none';
-  }
+/* ============ CLEAR / PRINT ============ */
+function clearEditor() {
+  if (!confirm('Clear all content?')) return;
+  document.getElementById('editor').innerHTML = '';
+  updateWordCount();
+}
 
-  // ── PDF ENGINE (Direct DOM Rendering for Mobile Compatibility) ──
-  function runPDF(action) {
-    const contentHTML = quill.root.innerHTML;
-    const textContent = quill.getText().trim();
-    const hasContent  = textContent.length > 0 || contentHTML.includes('<img');
-    const statusEl    = document.getElementById('exportStatus');
-    const btn         = document.getElementById(action === 'preview' ? 'previewBtn' : 'exportBtn');
-    const origHTML    = btn.innerHTML;
+function printDoc() {
+  window.print();
+}
 
-    if (!hasContent) {
-      if (action === 'save') {
-        statusEl.style.display = 'flex';
-        statusEl.className = 'status error fade-in';
-        statusEl.innerHTML = '<div class="status-dot"></div>Add some content before exporting.';
-      } else {
-        alert('Please add some content before previewing.');
-      }
-      return;
+/* ============ WATERMARK ============ */
+function toggleWatermark() {
+  const cb = document.getElementById('watermark-cb').checked;
+  document.getElementById('watermark-field').style.display = cb ? 'block' : 'none';
+}
+
+/* ============ IMAGES ============ */
+const imgDrop = document.getElementById('img-drop');
+function handleDragOver(e) { e.preventDefault(); imgDrop.classList.add('drag-over'); }
+function handleDragLeave() { imgDrop.classList.remove('drag-over'); }
+function handleImgDrop(e) {
+  e.preventDefault(); imgDrop.classList.remove('drag-over');
+  handleImgFiles(e.dataTransfer.files);
+}
+function handleImgFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => addToGallery(e.target.result, file.name);
+    reader.readAsDataURL(file);
+  });
+}
+function addToGallery(url, name) {
+  const idx = imgLibrary.push({ url, name }) - 1;
+  const gallery = document.getElementById('img-gallery');
+  const div = document.createElement('div');
+  div.className = 'img-thumb';
+  div.innerHTML = `<img src="${url}" alt="${name}"><button class="rm-btn" onclick="removeImg(event,${idx})">✕</button>`;
+  div.querySelector('img').addEventListener('click', () => insertImgAtCursor(url));
+  gallery.appendChild(div);
+}
+function removeImg(e, idx) {
+  e.stopPropagation();
+  imgLibrary[idx] = null;
+  e.target.closest('.img-thumb').remove();
+}
+function insertImgAtCursor(url) {
+  const editor = document.getElementById('editor');
+  editor.focus();
+  restoreRange();
+  document.execCommand('insertHTML', false, `<img src="${url}" style="max-width:100%;border-radius:10px;display:block;margin:12px 0">`);
+  updateWordCount();
+}
+
+/* ============ SAVE / RESTORE RANGE ============ */
+function saveRange() {
+  const sel = window.getSelection();
+  if (sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+}
+function restoreRange() {
+  if (!savedRange) return;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(savedRange);
+}
+document.getElementById('editor').addEventListener('blur', saveRange);
+
+/* ============ LINK MODAL ============ */
+function insertLink() {
+  saveRange();
+  const sel = window.getSelection();
+  const selected = sel.toString();
+  if (selected) document.getElementById('link-text').value = selected;
+  document.getElementById('link-modal').style.display = 'flex';
+}
+function confirmLink() {
+  const text = document.getElementById('link-text').value || 'Link';
+  const url = document.getElementById('link-url').value;
+  if (!url) { alert('Please enter a URL'); return; }
+  restoreRange();
+  document.getElementById('editor').focus();
+  document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" style="color:var(--orange)">${text}</a>`);
+  closeModal('link-modal');
+}
+
+/* ============ TABLE MODAL ============ */
+function insertTable() {
+  saveRange();
+  document.getElementById('table-modal').style.display = 'flex';
+}
+function confirmTable() {
+  const rows = parseInt(document.getElementById('tbl-rows').value) || 3;
+  const cols = parseInt(document.getElementById('tbl-cols').value) || 3;
+  const header = document.getElementById('tbl-header').checked;
+  let html = '<table style="border-collapse:collapse;width:100%;margin:12px 0">';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      const tag = (r === 0 && header) ? 'th' : 'td';
+      const style = tag==='th'
+        ? 'border:1px solid #D1C5BB;padding:8px 12px;background:#FFF7ED;font-weight:600;font-size:13px'
+        : 'border:1px solid #D1C5BB;padding:8px 12px;font-size:13px';
+      html += `<${tag} style="${style}">${tag==='th'?`Header ${c+1}`:`Cell`}</${tag}>`;
     }
+    html += '</tr>';
+  }
+  html += '</table><p></p>';
+  restoreRange();
+  document.getElementById('editor').focus();
+  document.execCommand('insertHTML', false, html);
+  closeModal('table-modal');
+}
 
-    btn.disabled  = true;
-    btn.innerHTML = `<div class="spinner"></div>${action === 'preview' ? 'Rendering…' : 'Generating…'}`;
-    if (action === 'save') {
-      statusEl.style.display = 'flex';
-      statusEl.className = 'status info fade-in';
-      statusEl.innerHTML  = '<div class="status-dot"></div>Building your PDF…';
-    }
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
 
-    const theme      = THEMES[currentTheme];
-    const fontFamily = document.getElementById('fontFamily').value;
-    const fontSize   = document.getElementById('bodyFontSize').value;
-    const lineHeight = document.getElementById('lineSpacing').value;
-    const marginMm   = parseInt(document.getElementById('margin').value);
-    const pageSize   = document.getElementById('pageSize').value;
-    const orient     = document.getElementById('orientation').value;
-    const hdrText    = document.getElementById('headerText').value.trim();
-    const ftrText    = document.getElementById('footerText').value.trim();
-    const showPN     = document.getElementById('pageNumToggle').checked;
-    const hasCover   = document.getElementById('coverToggle').checked;
-    const filename   = (document.getElementById('docFilename').value.trim() || 'palmtools_document')
-                         .toLowerCase().replace(/[^a-z0-9]+/g,'_') + '.pdf';
+/* ============ TEMPLATES ============ */
+const templates = {
+  blank: `<p></p>`,
 
-    let coverHTML = '';
-    if (hasCover) {
-      coverHTML = theme.cover({
-        title:    document.getElementById('coverTitle').value    || 'Untitled Document',
-        subtitle: document.getElementById('coverSubtitle').value,
-        author:   document.getElementById('coverAuthor').value,
-        date:     document.getElementById('coverDate').value
-      });
-    }
+  letter: `<p style="text-align:right;font-size:13px;color:#78716C">Your Name<br>Your Address<br>City, State ZIP<br>${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</p><p><br></p><p>Recipient Name<br>Company Name<br>Address<br>City, State ZIP</p><p><br></p><p>Dear Mr./Ms. [Recipient],</p><p><br></p><p>I am writing to you regarding [subject of letter]. [Opening paragraph that introduces the purpose of your letter.]</p><p><br></p><p>[Body paragraph. Add the details and supporting information here. Be clear and concise.]</p><p><br></p><p>[Closing paragraph. State what action you expect or what you will do next.]</p><p><br></p><p>Yours sincerely,</p><p><br><br></p><p>Your Name</p>`,
 
-    // 1. Create a physical container attached to the document body.
-    // This solves the mobile blank screen issue because the mobile browser is forced to paint it.
-    const printContainer = document.createElement('div');
-    printContainer.id = "pdf-temp-wrapper";
-    printContainer.style.cssText = `
-      position: absolute; 
-      top: 0; 
-      left: 0; 
-      width: 800px; 
-      z-index: -9999; 
-      background-color: ${theme.pageBg}; 
-      font-family: ${fontFamily}; 
-      font-size: ${fontSize}; 
-      line-height: ${lineHeight}; 
-      ${theme.bodyExtra}
-    `;
+  invoice: `<h1 style="color:#F97316;font-family:Syne,sans-serif">INVOICE</h1><p style="font-size:13px;color:#78716C">Invoice #: INV-001 &nbsp;|&nbsp; Date: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Due: ${new Date(Date.now()+30*86400000).toLocaleDateString()}</p><hr style="border:none;border-top:2px solid #F97316;margin:16px 0"><div style="display:flex;justify-content:space-between;gap:40px"><div><p><strong>From:</strong></p><p>Your Business Name<br>your@email.com<br>+1 555 000 0000</p></div><div><p><strong>Bill To:</strong></p><p>Client Name<br>client@email.com<br>Client Address</p></div></div><p><br></p><table style="border-collapse:collapse;width:100%;margin:12px 0"><tr><th style="border:1px solid #D1C5BB;padding:10px 12px;background:#FFF7ED;font-weight:700;font-size:13px;text-align:left">Description</th><th style="border:1px solid #D1C5BB;padding:10px 12px;background:#FFF7ED;font-weight:700;font-size:13px;text-align:right">Qty</th><th style="border:1px solid #D1C5BB;padding:10px 12px;background:#FFF7ED;font-weight:700;font-size:13px;text-align:right">Rate</th><th style="border:1px solid #D1C5BB;padding:10px 12px;background:#FFF7ED;font-weight:700;font-size:13px;text-align:right">Amount</th></tr><tr><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px">Service Description</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">1</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">$500.00</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">$500.00</td></tr><tr><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px">Additional Item</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">2</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">$150.00</td><td style="border:1px solid #D1C5BB;padding:10px 12px;font-size:13px;text-align:right">$300.00</td></tr></table><div style="text-align:right;margin-top:16px"><p style="font-size:13px;color:#78716C">Subtotal: $800.00</p><p style="font-size:13px;color:#78716C">Tax (10%): $80.00</p><p style="font-size:20px;font-weight:800;color:#F97316">Total: $880.00</p></div><hr style="border:none;border-top:1px solid #D1C5BB;margin:20px 0"><p style="font-size:12px;color:#A8A29E">Payment is due within 30 days. Bank transfer, PayPal, or Stripe accepted.</p>`,
 
-    // 2. Inject the HTML WITHOUT the `.ql-editor` class wrapper to prevent Quill's 
-    // internal CSS (like overflow-y: auto) from completely breaking the PDF engine.
-    printContainer.innerHTML = `
-      ${coverHTML}
-      <div style="padding: ${marginMm * 1.5}px; color: ${theme.textColor};">
-        ${contentHTML}
+  report: `<h1 style="font-family:Syne,sans-serif;font-size:30px">Report Title</h1><p style="color:#78716C;font-size:13px">Prepared by: Your Name &nbsp;|&nbsp; Date: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Version 1.0</p><hr style="border:none;border-top:2px solid #F97316;margin:16px 0"><h2 style="font-family:Syne,sans-serif">Executive Summary</h2><p>This report provides an analysis of [topic]. The key findings indicate that [summary of findings]. Recommendations are outlined in the final section.</p><h2 style="font-family:Syne,sans-serif">Background</h2><p>Provide context for the report here. Explain the problem or opportunity being addressed, relevant background information, and the scope of the analysis.</p><h2 style="font-family:Syne,sans-serif">Key Findings</h2><ul><li><strong>Finding 1:</strong> Description of the first key finding and its implications.</li><li><strong>Finding 2:</strong> Description of the second key finding and its implications.</li><li><strong>Finding 3:</strong> Additional supporting evidence and data points.</li></ul><h2 style="font-family:Syne,sans-serif">Analysis</h2><p>Detailed analysis of the findings. Include data, charts, and supporting evidence here. Discuss trends, patterns, and relationships discovered during the research process.</p><h2 style="font-family:Syne,sans-serif">Recommendations</h2><ol><li>First recommended action with rationale and expected outcome.</li><li>Second recommended action with timeline and responsible parties.</li><li>Third recommended action for long-term consideration.</li></ol><h2 style="font-family:Syne,sans-serif">Conclusion</h2><p>Summarize the key points of the report and reinforce the importance of the recommendations. Outline the next steps and any dependencies.</p>`,
+
+  resume: `<h1 style="font-family:Syne,sans-serif;font-size:28px;margin-bottom:4px">Your Full Name</h1><p style="color:#F97316;font-weight:600;font-size:14px;margin-bottom:8px">Job Title / Profession</p><p style="font-size:13px;color:#78716C">📧 email@example.com &nbsp;·&nbsp; 📱 +1 555 000 0000 &nbsp;·&nbsp; 🌐 yourwebsite.com &nbsp;·&nbsp; 📍 City, Country</p><hr style="border:none;border-top:2px solid #F97316;margin:16px 0"><h2 style="font-family:Syne,sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:0.05em;color:#78716C">Professional Summary</h2><p>A results-driven professional with [X] years of experience in [field]. Skilled in [key skills]. Passionate about [area of interest] and committed to delivering high-quality outcomes.</p><h2 style="font-family:Syne,sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:0.05em;color:#78716C;margin-top:20px">Experience</h2><p><strong>Senior Role Title</strong> &nbsp;·&nbsp; <em>Company Name</em> &nbsp;·&nbsp; <span style="color:#78716C;font-size:13px">2021 – Present</span></p><ul><li>Key achievement or responsibility using action verbs and measurable results.</li><li>Another significant contribution that demonstrates impact and skills.</li></ul><p style="margin-top:12px"><strong>Previous Role</strong> &nbsp;·&nbsp; <em>Previous Company</em> &nbsp;·&nbsp; <span style="color:#78716C;font-size:13px">2018 – 2021</span></p><ul><li>Responsibility or achievement from this role.</li><li>Another achievement with quantified results where possible.</li></ul><h2 style="font-family:Syne,sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:0.05em;color:#78716C;margin-top:20px">Education</h2><p><strong>Degree Name</strong> in [Major] &nbsp;·&nbsp; <em>University Name</em> &nbsp;·&nbsp; 2018</p><h2 style="font-family:Syne,sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:0.05em;color:#78716C;margin-top:20px">Skills</h2><p>Skill 1 &nbsp;·&nbsp; Skill 2 &nbsp;·&nbsp; Skill 3 &nbsp;·&nbsp; Skill 4 &nbsp;·&nbsp; Skill 5 &nbsp;·&nbsp; Skill 6 &nbsp;·&nbsp; Skill 7</p>`,
+
+  contract: `<h1 style="font-family:Syne,sans-serif;text-align:center">SERVICE AGREEMENT</h1><p style="text-align:center;font-size:13px;color:#78716C">This Agreement is entered into as of ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</p><hr style="border:none;border-top:2px solid #F97316;margin:20px 0"><p><strong>BETWEEN:</strong> [Client Name], hereinafter referred to as "Client", and [Service Provider Name], hereinafter referred to as "Provider".</p><h2 style="font-family:Syne,sans-serif;margin-top:20px">1. Scope of Services</h2><p>Provider agrees to perform the following services: [Detailed description of services to be provided, including deliverables, timelines, and specifications].</p><h2 style="font-family:Syne,sans-serif">2. Payment Terms</h2><p>Client agrees to pay Provider the sum of $[Amount] for the services outlined above. Payment shall be due within [X] days of invoice issuance. Late payments shall incur a fee of [X]% per month.</p><h2 style="font-family:Syne,sans-serif">3. Term</h2><p>This Agreement shall commence on [Start Date] and shall continue until [End Date] unless terminated earlier in accordance with the terms herein.</p><h2 style="font-family:Syne,sans-serif">4. Confidentiality</h2><p>Both parties agree to maintain the confidentiality of any proprietary information shared during the term of this Agreement.</p><h2 style="font-family:Syne,sans-serif">5. Termination</h2><p>Either party may terminate this Agreement with [X] days written notice. Upon termination, Client shall pay for all work completed up to the termination date.</p><h2 style="font-family:Syne,sans-serif">6. Governing Law</h2><p>This Agreement shall be governed by the laws of [State/Country].</p><div style="margin-top:40px;display:flex;gap:60px"><div><hr style="border-top:1px solid #1C1917;width:180px"><p style="font-size:13px;margin-top:6px">Client Signature<br><em style="color:#78716C">[Print Name & Date]</em></p></div><div><hr style="border-top:1px solid #1C1917;width:180px"><p style="font-size:13px;margin-top:6px">Provider Signature<br><em style="color:#78716C">[Print Name & Date]</em></p></div></div>`
+};
+
+function loadTemplate(name) {
+  if (document.getElementById('editor').innerHTML.trim() && !confirm('Replace current content with this template?')) return;
+  document.getElementById('editor').innerHTML = templates[name] || '';
+  updateWordCount();
+}
+
+/* ============ PDF GENERATION ============ */
+async function generatePDF() {
+  const editor = document.getElementById('editor');
+  const content = editor.innerHTML.trim();
+  if (!content) { showStatus('error', 'Editor is empty. Add some content first.'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating PDF…';
+  showStatus('info', 'Rendering your document…');
+
+  try {
+    const { jsPDF } = window.jspdf;
+
+    const paperSize = document.getElementById('paperSize').value;
+    const mTop = parseInt(document.getElementById('m-top').value) || 20;
+    const mBottom = parseInt(document.getElementById('m-bottom').value) || 20;
+    const mLeft = parseInt(document.getElementById('m-left').value) || 20;
+    const mRight = parseInt(document.getElementById('m-right').value) || 20;
+    const docTitle = document.getElementById('doc-title').value || 'Document';
+    const headerText = document.getElementById('header-text').value;
+    const footerText = document.getElementById('footer-text').value;
+    const showPageNums = document.getElementById('page-nums').checked;
+    const showWatermark = document.getElementById('watermark-cb').checked;
+    const watermarkText = document.getElementById('watermark-text').value || 'DRAFT';
+
+    // Paper dimensions in mm
+    const papers = {
+      a4: [210, 297], letter: [215.9, 279.4],
+      legal: [215.9, 355.6], a3: [297, 420], a5: [148, 210]
+    };
+    const [pw, ph] = papers[paperSize] || papers.a4;
+    const isLand = orientation === 'landscape';
+    const pageW = isLand ? ph : pw;
+    const pageH = isLand ? pw : ph;
+
+    // Build render container
+    const render = document.getElementById('pdf-render');
+    const contentWidthPx = 960;
+    const scale = (pageW - mLeft - mRight) / (contentWidthPx / 3.7795); // mm to px roughly
+    render.style.width = contentWidthPx + 'px';
+    render.style.padding = '0';
+    render.style.fontFamily = "'DM Sans', sans-serif";
+    render.style.fontSize = '15px';
+    render.style.lineHeight = '1.8';
+    render.style.color = '#1C1917';
+    render.style.background = 'white';
+
+    // Build inner HTML with styling
+    render.innerHTML = `
+      <div style="width:100%;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.8;color:#1C1917">
+        ${content}
       </div>
     `;
 
-    // 3. Force the template colors onto the text to override your app's Dark Mode (white text),
-    // but SKIP elements where the user manually changed the color in the editor.
-    const elements = printContainer.querySelectorAll('*');
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
-      if (el.style && el.style.color) continue; // Protects custom Quill colors
-      
-      const tag = el.tagName.toUpperCase();
-      if (['H1','H2','H3','H4','H5','H6'].includes(tag)) {
-        el.style.color = theme.headColor;
-      } else if (['P','SPAN','DIV','LI','A','BLOCKQUOTE','STRONG','EM'].includes(tag)) {
-        el.style.color = theme.textColor;
+    // Inject base styles for render
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `
+      h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin:20px 0 12px;line-height:1.2}
+      h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin:16px 0 10px}
+      h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:12px 0 8px}
+      p{margin-bottom:10px} ul,ol{padding-left:24px;margin-bottom:10px}
+      blockquote{border-left:4px solid #F97316;padding:12px 18px;margin:16px 0;color:#78716C;background:#FFF7ED;border-radius:0 10px 10px 0;font-style:italic}
+      table{border-collapse:collapse;width:100%;margin:12px 0}
+      td,th{border:1px solid #D1C5BB;padding:8px 12px;font-size:13px}
+      th{background:#FFF7ED;font-weight:600}
+      img{max-width:100%;border-radius:10px;display:block;margin:12px 0}
+      a{color:#F97316;text-decoration:underline}
+      hr{border:none;border-top:2px solid #E2E8F0;margin:20px 0}
+    `;
+    render.appendChild(styleTag);
+
+    // Capture with html2canvas
+    const canvas = await html2canvas(render, {
+      scale: 2, useCORS: true, allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    render.innerHTML = '';
+
+    const doc = new jsPDF({
+      orientation: orientation,
+      unit: 'mm',
+      format: paperSize === 'letter' ? [215.9, 279.4] : paperSize === 'legal' ? [215.9, 355.6] : paperSize
+    });
+
+    const totalPages = Math.ceil(canvas.height / (canvas.width * (pageH - mTop - mBottom) / (pageW - mLeft - mRight)));
+    const contentH = pageH - mTop - mBottom;
+    const contentW = pageW - mLeft - mRight;
+    const canvasW = canvas.width;
+    const canvasH = canvas.height;
+    const ratio = contentW / canvasW * (canvasW / canvas.width);
+    const sliceH = Math.floor(canvasH / totalPages);
+
+    for (let p = 0; p < totalPages; p++) {
+      if (p > 0) doc.addPage();
+
+      // Slice canvas for this page
+      const pageCanvas = document.createElement('canvas');
+      const startY = p * sliceH;
+      const endY = Math.min((p + 1) * sliceH, canvasH);
+      pageCanvas.width = canvasW;
+      pageCanvas.height = endY - startY;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, startY, canvasW, endY - startY, 0, 0, canvasW, endY - startY);
+      const imgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+      const sliceHmm = (endY - startY) / canvasH * canvasH / canvasW * contentW;
+
+      doc.addImage(imgData, 'JPEG', mLeft, mTop, contentW, sliceHmm);
+
+      // Header
+      if (headerText) {
+        doc.setFontSize(9);
+        doc.setTextColor(120, 113, 108);
+        doc.text(headerText, mLeft, mTop - 6);
+        doc.setDrawColor(249, 115, 22);
+        doc.setLineWidth(0.4);
+        doc.line(mLeft, mTop - 3, pageW - mRight, mTop - 3);
+      }
+
+      // Footer
+      doc.setFontSize(9);
+      doc.setTextColor(168, 162, 158);
+      if (footerText) {
+        const ft = footerText.replace('{n}', p + 1).replace('{total}', totalPages);
+        doc.text(ft, mLeft, pageH - mBottom + 8);
+      }
+      if (showPageNums) {
+        const pageStr = `${p + 1} / ${totalPages}`;
+        doc.text(pageStr, pageW - mRight, pageH - mBottom + 8, { align: 'right' });
+      }
+
+      // Watermark
+      if (showWatermark) {
+        doc.saveGraphicsState();
+        doc.setFontSize(52);
+        doc.setTextColor(230, 230, 230);
+        doc.setGState(new doc.GState({ opacity: 0.25 }));
+        doc.text(watermarkText, pageW / 2, pageH / 2, { align: 'center', angle: 45 });
+        doc.restoreGraphicsState();
       }
     }
 
-    // Protect Images
-    printContainer.querySelectorAll('img').forEach(img => {
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-      img.style.display = 'block';
-    });
+    // Set metadata
+    doc.setProperties({ title: docTitle, creator: 'Text to PDF Tool' });
 
-    // 4. Temporarily add it to the live page layout
-    document.body.appendChild(printContainer);
+    const filename = docTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.pdf';
+    doc.save(filename);
 
-    const hasHdr = !!hdrText;
-    const hasFtr = ftrText || showPN;
-
-    const opt = {
-      margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
-      filename:    filename,
-      image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg, windowWidth: 800 },
-      pagebreak:   { mode: ['css', 'legacy'] },
-      jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
-    };
-
-    html2pdf().set(opt).from(printContainer).toPdf().get('pdf').then(pdf => {
-      const total = pdf.internal.getNumberOfPages();
-      const pgW   = pdf.internal.pageSize.getWidth();
-      const pgH   = pdf.internal.pageSize.getHeight();
-      const mm    = marginMm;
-      const isDark   = currentTheme === 'dark';
-      const lineRGB  = isDark ? [55,75,105]    : [210,210,210];
-      const txtRGB   = isDark ? [110,135,165]  : [150,150,150];
-
-      for (let i = 1; i <= total; i++) {
-        pdf.setPage(i);
-        const isCoverPage = hasCover && i === 1;
-        if (isCoverPage) continue;
-
-        if (hasHdr) {
-          pdf.setFontSize(8.5);
-          pdf.setTextColor(...txtRGB);
-          const hX = headerAlign === 'center' ? pgW/2 : headerAlign === 'right' ? pgW - mm : mm;
-          pdf.text(hdrText, hX, 7, { align: headerAlign });
-          pdf.setDrawColor(...lineRGB);
-          pdf.setLineWidth(0.28);
-          pdf.line(mm, 9.5, pgW - mm, 9.5);
-        }
-
-        if (hasFtr) {
-          pdf.setDrawColor(...lineRGB);
-          pdf.setLineWidth(0.28);
-          pdf.line(mm, pgH - 11, pgW - mm, pgH - 11);
-          pdf.setFontSize(8.5);
-          pdf.setTextColor(...txtRGB);
-
-          if (ftrText) {
-            pdf.text(ftrText, mm, pgH - 7.5, { align: 'left' });
-          }
-
-          if (showPN) {
-            const n = hasCover ? i - 1 : i;
-            const t = hasCover ? total - 1 : total;
-            const label = pnFormat.replace('{n}', n).replace('{t}', t);
-            const pX = pnPos === 'left' ? mm : pnPos === 'right' ? pgW - mm : pgW / 2;
-            pdf.text(label, pX, pgH - 7.5, { align: pnPos });
-          }
-        }
-      }
-
-      // 5. Clean up the physical element we appended
-      document.body.removeChild(printContainer);
-
-      if (action === 'preview') {
-        const blobUrl = pdf.output('bloburl');
-        const previewWrapper = document.getElementById('previewWrapper');
-        
-        previewWrapper.innerHTML = `
-          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; background: var(--bg-2);">
-            <p style="color: var(--text-muted); margin-bottom: 16px;">Your document is ready to preview.</p>
-            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
-          </div>
-        `;
-        
-        previewWrapper.style.display = 'block';
-        btn.disabled  = false;
-        btn.innerHTML = origHTML;
-      } else {
-        pdf.save(filename);
-        statusEl.className = 'status success fade-in';
-        statusEl.innerHTML  = '<div class="status-dot"></div>PDF downloaded successfully!';
-        btn.disabled  = false;
-        btn.innerHTML = origHTML;
-      }
-    }).catch(err => {
-      // Ensure we clean up even if it fails
-      if (document.body.contains(printContainer)) {
-        document.body.removeChild(printContainer);
-      }
-      btn.disabled  = false;
-      btn.innerHTML = origHTML;
-      if (action === 'save') {
-        statusEl.className = 'status error fade-in';
-        statusEl.innerHTML  = `<div class="status-dot"></div>Error: ${err.message}`;
-      } else {
-        alert('Error: ' + err.message);
-      }
-    });
+    showStatus('success', `✓ PDF exported successfully as "${filename}"`);
+  } catch (err) {
+    console.error(err);
+    showStatus('error', 'Export failed. Try reducing image sizes or content length.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export PDF`;
   }
-  </script>
+}
+
+/* ============ STATUS ============ */
+function showStatus(type, msg) {
+  const area = document.getElementById('status-area');
+  area.innerHTML = `
+    <div class="status ${type}">
+      <div class="status-dot"></div>
+      <span>${msg}</span>
+    </div>`;
+  if (type === 'success') setTimeout(() => { area.innerHTML = ''; }, 5000);
+}
+
+/* ============ KEYBOARD SHORTCUTS ============ */
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    generatePDF();
+  }
+});
+
+/* ============ INIT ============ */
+document.getElementById('editor').focus();
+updateWordCount();
+</script>
 </body>
-</html>
+  </html>

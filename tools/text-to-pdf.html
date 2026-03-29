@@ -53,18 +53,12 @@
     }
     
     /* Toolbar active states */
-    .ql-snow.ql-toolbar button:hover, 
-    .ql-snow .ql-toolbar button:hover, 
-    .ql-snow.ql-toolbar button.ql-active, 
-    .ql-snow .ql-toolbar button.ql-active, 
-    .ql-snow.ql-toolbar .ql-picker-label:hover, 
-    .ql-snow .ql-toolbar .ql-picker-label:hover, 
-    .ql-snow.ql-toolbar .ql-picker-label.ql-active, 
-    .ql-snow .ql-toolbar .ql-picker-label.ql-active, 
-    .ql-snow.ql-toolbar .ql-picker-item:hover, 
-    .ql-snow .ql-toolbar .ql-picker-item:hover, 
-    .ql-snow.ql-toolbar .ql-picker-item.ql-selected, 
-    .ql-snow .ql-toolbar .ql-picker-item.ql-selected {
+    .ql-snow.ql-toolbar button:hover, .ql-snow .ql-toolbar button:hover, 
+    .ql-snow.ql-toolbar button.ql-active, .ql-snow .ql-toolbar button.ql-active, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover, .ql-snow .ql-toolbar .ql-picker-label:hover, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active, .ql-snow .ql-toolbar .ql-picker-label.ql-active, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover, .ql-snow .ql-toolbar .ql-picker-item:hover, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected, .ql-snow .ql-toolbar .ql-picker-item.ql-selected {
       color: var(--orange);
     }
     .ql-snow.ql-toolbar button:hover .ql-fill, .ql-snow .ql-toolbar button:hover .ql-fill, 
@@ -98,7 +92,7 @@
     
     .options-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 14px;
     }
     .preview-iframe-wrapper {
@@ -108,6 +102,11 @@
       border-radius: 12px; 
       overflow: hidden;
       background: var(--bg-2);
+    }
+    .swatch-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
   </style>
 </head>
@@ -169,6 +168,13 @@
             <option value="30">Wide</option>
           </select>
         </div>
+        <div class="field">
+          <label class="label">Background Color</label>
+          <div class="swatch-row">
+            <input type="color" id="pageBg" value="#ffffff" />
+            <span style="font-size: 14px; color: var(--text-muted)">Page fill</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -200,21 +206,36 @@
   </div>
 
   <script>
-    // 1. Initialize Quill Rich Text Editor
+    // 1. Inject custom SVG icons for Undo/Redo into Quill's icon library
+    const icons = Quill.import('ui/icons');
+    icons['undo'] = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="6 10 4 12 2 10 6 10"></polygon><path class="ql-stroke" d="M8.09,13.91A4.6,4.6,0,0,0,9,14,5,5,0,1,0,4,9"></path></svg>';
+    icons['redo'] = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="12 10 14 12 16 10 12 10"></polygon><path class="ql-stroke" d="M9.91,13.91A4.6,4.6,0,0,1,9,14a5,5,0,1,1,5-5"></path></svg>';
+
+    // 2. Initialize Quill Rich Text Editor
     const toolbarOptions = [
-      [{ 'size': ['small', false, 'large', 'huge'] }],
-      ['bold', 'italic', 'underline', 'strike'], 
-      [{ 'color': [] }, { 'background': [] }],   
-      [{ 'align': [] }],                         
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      ['image', 'link'],                         
-      ['clean']                                  
+      ['undo', 'redo'],                                  // Undo / Redo
+      [{ 'size': ['small', false, 'large', 'huge'] }],   // Font sizes
+      ['bold', 'italic', 'underline', 'strike'],         // Toggled styling
+      [{ 'color': [] }, { 'background': [] }],           // Text / Highlight Colors
+      [{ 'align': [] }],                                 // Alignments
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],      // Lists
+      ['image', 'link'],                                 // Media
+      ['clean']                                          // Clear formatting
     ];
 
     const quill = new Quill('#editor-container', {
-      modules: { toolbar: toolbarOptions },
+      modules: { 
+        toolbar: {
+          container: toolbarOptions,
+          handlers: {
+            'undo': function() { this.quill.history.undo(); },
+            'redo': function() { this.quill.history.redo(); }
+          }
+        },
+        history: { delay: 1000, maxStack: 100, userOnly: true }
+      },
       theme: 'snow',
-      placeholder: 'Start writing your document... You can highlight text to change its size and color, or click the image icon to insert photos!'
+      placeholder: 'Start writing your document... Highlight text to edit size and color, or insert photos!'
     });
 
     quill.root.addEventListener('focus', () => document.querySelector('.ql-container').classList.add('focus'));
@@ -228,7 +249,7 @@
       }
     }
 
-    // 2. Process PDF (Handles both Previewing and Saving)
+    // 3. Process PDF (Handles both Previewing and Saving)
     function processPDF(action) {
       const contentHTML = quill.root.innerHTML;
       const title = document.getElementById('docTitle').value.trim();
@@ -258,6 +279,9 @@
         statusEl.innerHTML = '<div class="status-dot"></div>Formatting pages and generating your PDF…';
       }
 
+      // Get page background color
+      const pageBgColor = document.getElementById('pageBg').value;
+
       // Create a hidden container to accurately render HTML structure for PDF compilation
       const printContainer = document.createElement('div');
       printContainer.className = 'ql-editor'; 
@@ -266,6 +290,12 @@
       printContainer.style.position = 'absolute';
       printContainer.style.left = '-9999px';
       printContainer.style.top = '0';
+      
+      // Apply background color so it affects the entire document
+      printContainer.style.backgroundColor = pageBgColor;
+      // Force minimum height to ensure short documents still have full-page background color
+      printContainer.style.minHeight = '1122px'; // roughly A4 height in px
+      
       document.body.appendChild(printContainer);
 
       const marginMm = parseInt(document.getElementById('margin').value);
@@ -275,7 +305,7 @@
         margin:       marginMm,
         filename:     filename,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: pageBgColor },
         pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, 
         jsPDF:        { 
           unit: 'mm', 
@@ -284,9 +314,9 @@
         }
       };
 
-      // Generate the PDF
+      // Generate the PDF using the correct .output('bloburl') function call
       if (action === 'preview') {
-        html2pdf().set(opt).from(printContainer).outputPdf('bloburl').then((pdfUrl) => {
+        html2pdf().set(opt).from(printContainer).output('bloburl').then(function(pdfUrl) {
           document.body.removeChild(printContainer);
           document.getElementById('previewWrapper').style.display = 'block';
           document.getElementById('pdfIframe').src = pdfUrl;

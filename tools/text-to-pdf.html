@@ -5,97 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Text to PDF — PALMTOOLS</title>
   <link rel="stylesheet" href="../shared.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
   <style>
-    .toolbar {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-    }
-    .fmt-btn {
-      padding: 7px 12px;
-      border-radius: 8px;
-      border: 1.5px solid var(--border-subtle);
-      background: var(--surface-2);
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-      transition: all 0.15s;
-    }
-    .fmt-btn:hover, .fmt-btn.active {
-      border-color: var(--orange);
-      color: var(--orange);
-      background: var(--orange-glow);
-    }
-    #textEditor {
-      width: 100%;
-      min-height: 280px;
-      padding: 18px;
-      background: var(--bg-2);
-      border: 1.5px solid var(--border-subtle);
+    /* Quill Editor PALMTOOLS Overrides */
+    .editor-wrapper {
+      background: var(--surface);
       border-radius: 12px;
+      margin-top: 8px;
+    }
+    .ql-toolbar.ql-snow {
+      border: 1.5px solid var(--border-subtle);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      background: var(--surface-2);
+      font-family: 'DM Sans', sans-serif;
+      padding: 12px;
+    }
+    .ql-container.ql-snow {
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 0 0 12px 12px;
+      background: var(--bg-2);
       font-family: 'DM Sans', sans-serif;
       font-size: 15px;
       color: var(--text);
-      outline: none;
-      resize: vertical;
-      line-height: 1.75;
+      min-height: 400px;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    #textEditor:focus {
+    .ql-container.ql-snow.focus {
       border-color: var(--orange);
       box-shadow: 0 0 0 3px var(--orange-glow);
     }
-    .char-count {
-      font-size: 12px;
-      color: var(--text-faint);
-      text-align: right;
-      margin-top: 6px;
-    }
-    .preview-box {
-      background: white;
-      color: #1C1917;
-      border-radius: 12px;
-      padding: 28px 32px;
-      border: 1.5px solid var(--border-subtle);
-      min-height: 200px;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
+    .ql-editor {
+      min-height: 400px;
       line-height: 1.75;
-      white-space: pre-wrap;
-      word-break: break-word;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-      max-height: 340px;
-      overflow-y: auto;
+      padding: 24px;
     }
-    .preview-header {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-faint);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .ql-editor img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    /* Toolbar active states */
+    .ql-snow.ql-toolbar button:hover, 
+    .ql-snow .ql-toolbar button:hover, 
+    .ql-snow.ql-toolbar button.ql-active, 
+    .ql-snow .ql-toolbar button.ql-active, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover, 
+    .ql-snow .ql-toolbar .ql-picker-label:hover, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active, 
+    .ql-snow .ql-toolbar .ql-picker-label.ql-active, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover, 
+    .ql-snow .ql-toolbar .ql-picker-item:hover, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected, 
+    .ql-snow .ql-toolbar .ql-picker-item.ql-selected {
+      color: var(--orange);
+    }
+    .ql-snow.ql-toolbar button:hover .ql-fill, 
+    .ql-snow .ql-toolbar button:hover .ql-fill, 
+    .ql-snow.ql-toolbar button.ql-active .ql-fill, 
+    .ql-snow .ql-toolbar button.ql-active .ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover .ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-label:hover .ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover .ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-item:hover .ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-fill, 
+    .ql-snow.ql-toolbar button:hover .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar button:hover .ql-stroke.ql-fill, 
+    .ql-snow.ql-toolbar button.ql-active .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar button.ql-active .ql-stroke.ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke.ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke.ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke.ql-fill, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke.ql-fill, 
+    .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke.ql-fill {
+      fill: var(--orange);
+    }
+    .ql-snow.ql-toolbar button:hover .ql-stroke, 
+    .ql-snow .ql-toolbar button:hover .ql-stroke, 
+    .ql-snow.ql-toolbar button.ql-active .ql-stroke, 
+    .ql-snow .ql-toolbar button.ql-active .ql-stroke, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke, 
+    .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke, 
+    .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke, 
+    .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke, 
+    .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke, 
+    .ql-snow.ql-toolbar button:hover .ql-stroke-miter, 
+    .ql-snow .ql-toolbar button:hover .ql-stroke-miter, 
+    .ql-snow.ql-toolbar button.ql-active .ql-stroke-miter, 
+    .ql-snow .ql-toolbar button.ql-active .ql-stroke-miter, 
+    .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke-miter, 
+    .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke-miter, 
+    .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke-miter, 
+    .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke-miter, 
+    .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke-miter, 
+    .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke-miter, 
+    .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke-miter, 
+    .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke-miter {
+      stroke: var(--orange);
     }
     .options-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 14px;
-    }
-    .page-preview-thumb {
-      display: inline-block;
-      background: white;
-      border: 1.5px solid var(--border);
-      border-radius: 4px;
-      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
-      width: 24px; height: 34px;
-      vertical-align: middle;
-      margin-right: 6px;
     }
   </style>
 </head>
@@ -110,96 +136,56 @@
 
     <header class="tool-header">
       <div class="tool-icon-badge">📄</div>
-      <h1 class="tool-title">Text <span class="accent">to PDF</span></h1>
-      <p class="tool-subtitle">Type or paste your content and export as a clean, formatted PDF. Customize fonts, size, and layout.</p>
+      <h1 class="tool-title">Rich Text <span class="accent">to PDF</span></h1>
+      <p class="tool-subtitle">Write, format, add images, and colorize your text. Export directly as an automatically paginated PDF document.</p>
     </header>
 
-    <!-- Editor -->
     <div class="card">
-      <div class="card-title">Content</div>
+      <div class="card-title">Document Content</div>
 
-      <!-- Optional title field -->
       <div class="field">
-        <label class="label">Document Title (optional)</label>
-        <input class="input" type="text" id="docTitle" placeholder="My Document" oninput="updatePreview()" />
+        <label class="label">Document Title (Saved as Filename)</label>
+        <input class="input" type="text" id="docTitle" placeholder="My Awesome Document" />
       </div>
 
       <div class="field">
-        <label class="label">Body Text</label>
-        <textarea id="textEditor" placeholder="Start typing your content here…&#10;&#10;You can paste text from anywhere. Paragraphs, lists, notes — anything you need to turn into a PDF." oninput="updateCharCount(); updatePreview()"></textarea>
-        <div class="char-count"><span id="charCount">0</span> characters · <span id="lineCount">0</span> lines</div>
+        <label class="label">Body Text & Images</label>
+        <div class="editor-wrapper">
+          <div id="editor-container"></div>
+        </div>
       </div>
     </div>
 
-    <!-- PDF Options -->
     <div class="card">
-      <div class="card-title">PDF Settings</div>
+      <div class="card-title">PDF Layout Settings</div>
       <div class="options-grid">
         <div class="field">
           <label class="label">Page Size</label>
-          <select class="input" id="pageSize" onchange="updatePreview()">
-            <option value="a4">A4</option>
+          <select class="input" id="pageSize">
+            <option value="a4" selected>A4</option>
             <option value="letter">Letter</option>
-            <option value="a5">A5</option>
             <option value="a3">A3</option>
+            <option value="legal">Legal</option>
           </select>
         </div>
         <div class="field">
           <label class="label">Orientation</label>
-          <select class="input" id="orientation" onchange="updatePreview()">
-            <option value="portrait">Portrait</option>
+          <select class="input" id="orientation">
+            <option value="portrait" selected>Portrait</option>
             <option value="landscape">Landscape</option>
           </select>
         </div>
         <div class="field">
-          <label class="label">Font Size</label>
-          <select class="input" id="fontSize" onchange="updatePreview()">
-            <option value="10">Small (10pt)</option>
-            <option value="12" selected>Normal (12pt)</option>
-            <option value="14">Large (14pt)</option>
-            <option value="16">Extra Large (16pt)</option>
-          </select>
-        </div>
-        <div class="field">
           <label class="label">Margin</label>
-          <select class="input" id="margin" onchange="updatePreview()">
-            <option value="15">Narrow (15mm)</option>
-            <option value="20" selected>Normal (20mm)</option>
-            <option value="30">Wide (30mm)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Font</label>
-          <select class="input" id="fontChoice" onchange="updatePreview()">
-            <option value="helvetica">Helvetica (Sans)</option>
-            <option value="times">Times (Serif)</option>
-            <option value="courier">Courier (Mono)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="label">Line Spacing</label>
-          <select class="input" id="lineSpacing" onchange="updatePreview()">
-            <option value="1">Single</option>
-            <option value="1.5" selected>1.5×</option>
-            <option value="2">Double</option>
+          <select class="input" id="margin">
+            <option value="10">Narrow</option>
+            <option value="20" selected>Normal</option>
+            <option value="30">Wide</option>
           </select>
         </div>
       </div>
     </div>
 
-    <!-- Preview -->
-    <div class="card">
-      <div class="card-title">Preview</div>
-      <div class="preview-header">
-        <span>Page preview</span>
-        <span id="pageCountLabel" style="color:var(--text-faint)">—</span>
-      </div>
-      <div class="preview-box" id="previewBox">
-        <em style="color:#aaa">Your content will appear here…</em>
-      </div>
-    </div>
-
-    <!-- Convert -->
     <div class="card">
       <div class="card-title">Export</div>
       <div id="convertStatus" style="display:none"></div>
@@ -208,170 +194,108 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download PDF
         </button>
-        <button class="btn btn-ghost" onclick="clearText()">Clear text</button>
+        <button class="btn btn-ghost" onclick="clearText()">Clear document</button>
       </div>
     </div>
   </div>
 
   <script>
-    function updateCharCount() {
-      const text = document.getElementById('textEditor').value;
-      document.getElementById('charCount').textContent = text.length.toLocaleString();
-      document.getElementById('lineCount').textContent = text.split('\n').length.toLocaleString();
-    }
+    // 1. Initialize Quill Rich Text Editor
+    const toolbarOptions = [
+      [{ 'size': ['small', false, 'large', 'huge'] }],  // custom sizes
+      ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
+      [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults
+      [{ 'align': [] }],                                // text alignment
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],     // lists
+      ['image', 'link'],                                // media & links
+      ['clean']                                         // remove formatting button
+    ];
 
-    function updatePreview() {
-      const title = document.getElementById('docTitle').value.trim();
-      const text = document.getElementById('textEditor').value;
-      const box = document.getElementById('previewBox');
-      const fontFamilies = { helvetica: 'Arial, sans-serif', times: 'Georgia, serif', courier: 'Courier New, monospace' };
-      const font = fontFamilies[document.getElementById('fontChoice').value] || 'Arial, sans-serif';
-      const fontSize = document.getElementById('fontSize').value;
-      const lineSpacing = document.getElementById('lineSpacing').value;
+    const quill = new Quill('#editor-container', {
+      modules: { toolbar: toolbarOptions },
+      theme: 'snow',
+      placeholder: 'Start writing your document... You can highlight text to change its size and color, or click the image icon to insert photos!'
+    });
 
-      if (!text.trim() && !title) {
-        box.innerHTML = '<em style="color:#aaa">Your content will appear here…</em>';
-        document.getElementById('pageCountLabel').textContent = '—';
-        return;
-      }
-
-      let html = '';
-      if (title) {
-        html += `<div style="font-size:${parseInt(fontSize)+4}px;font-weight:700;margin-bottom:12px;font-family:${font}">${escHtml(title)}</div>`;
-        html += `<hr style="border:none;border-top:1px solid #ddd;margin-bottom:14px"/>`;
-      }
-      html += `<div style="font-family:${font};font-size:${fontSize}px;line-height:${lineSpacing}">${escHtml(text).replace(/\n/g, '<br/>')}</div>`;
-      box.innerHTML = html;
-
-      // Rough page count estimate
-      const fontSize_n = parseInt(fontSize);
-      const lineH = fontSize_n * 1.2 * parseFloat(lineSpacing);
-      const margin = parseInt(document.getElementById('margin').value);
-      const pageSize = document.getElementById('pageSize').value;
-      const orient = document.getElementById('orientation').value;
-      const pageDims = { a4:[210,297], letter:[215.9,279.4], a5:[148,210], a3:[297,420] };
-      let [pw,ph] = pageDims[pageSize] || pageDims.a4;
-      if (orient === 'landscape') [pw,ph] = [ph,pw];
-      const availH_mm = ph - margin * 2;
-      const availH_pt = availH_mm * 2.8346;
-      const linesPerPage = Math.floor(availH_pt / lineH);
-      const totalLines = text.split('\n').reduce((sum, line) => {
-        const availW_mm = pw - margin * 2;
-        const charsPerLine = Math.max(1, Math.floor(availW_mm * 2.8346 / (fontSize_n * 0.6)));
-        return sum + Math.max(1, Math.ceil(line.length / charsPerLine));
-      }, 0);
-      const pages = Math.max(1, Math.ceil(totalLines / linesPerPage));
-      document.getElementById('pageCountLabel').textContent = `~${pages} page${pages !== 1 ? 's' : ''}`;
-    }
-
-    function escHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
+    // Add focus styling logic
+    quill.root.addEventListener('focus', () => document.querySelector('.ql-container').classList.add('focus'));
+    quill.root.addEventListener('blur', () => document.querySelector('.ql-container').classList.remove('focus'));
 
     function clearText() {
-      document.getElementById('textEditor').value = '';
-      document.getElementById('docTitle').value = '';
-      updateCharCount();
-      updatePreview();
+      if(confirm("Are you sure you want to clear the entire document?")) {
+        quill.setContents([]);
+        document.getElementById('docTitle').value = '';
+      }
     }
 
+    // 2. Generate PDF via html2pdf
     function generatePDF() {
-      const text = document.getElementById('textEditor').value.trim();
+      const contentHTML = quill.root.innerHTML;
       const title = document.getElementById('docTitle').value.trim();
+      const statusEl = document.getElementById('convertStatus');
+      const btn = document.getElementById('convertBtn');
 
-      if (!text && !title) {
-        const statusEl = document.getElementById('convertStatus');
+      if (quill.getText().trim().length === 0 && !contentHTML.includes('<img')) {
         statusEl.style.display = 'flex';
         statusEl.className = 'status error fade-in';
-        statusEl.innerHTML = '<div class="status-dot"></div>Please enter some text first.';
+        statusEl.innerHTML = '<div class="status-dot"></div>Please enter some text or add an image first.';
         return;
       }
 
-      const btn = document.getElementById('convertBtn');
-      const statusEl = document.getElementById('convertStatus');
       btn.disabled = true;
-      btn.innerHTML = '<div class="spinner"></div> Generating…';
+      btn.innerHTML = '<div class="spinner"></div> Generating PDF…';
       statusEl.style.display = 'flex';
       statusEl.className = 'status info fade-in';
-      statusEl.innerHTML = '<div class="status-dot"></div>Creating your PDF…';
+      statusEl.innerHTML = '<div class="status-dot"></div>Formatting pages and generating your PDF…';
 
-      try {
-        const { jsPDF } = window.jspdf;
+      // Create a temporary hidden container to render the PDF properly
+      // We apply the "ql-editor" class so the Quill CSS is retained in the PDF.
+      const printContainer = document.createElement('div');
+      printContainer.className = 'ql-editor'; 
+      
+      // Inject CSS rule to make sure large images automatically resize to fit the PDF page width
+      printContainer.innerHTML = `<style>img { max-width: 100%; height: auto; }</style>` + contentHTML;
+      
+      // Style the container for A4/Letter width representation so text wraps accurately
+      printContainer.style.width = '800px'; 
+      printContainer.style.position = 'absolute';
+      printContainer.style.left = '-9999px';
+      printContainer.style.top = '0';
+      document.body.appendChild(printContainer);
 
-        const pageSizeVal = document.getElementById('pageSize').value;
-        const orient = document.getElementById('orientation').value;
-        const fontSizePt = parseInt(document.getElementById('fontSize').value);
-        const marginMm = parseInt(document.getElementById('margin').value);
-        const fontChoice = document.getElementById('fontChoice').value;
-        const lineSpacing = parseFloat(document.getElementById('lineSpacing').value);
+      const marginMm = parseInt(document.getElementById('margin').value);
+      const filename = (title || 'palmtools_document').toLowerCase().replace(/[^a-z0-9]+/g,'_') + '.pdf';
 
-        const pageSizes = { a4:[210,297], letter:[215.9,279.4], a5:[148,210], a3:[297,420] };
-        let [pw,ph] = pageSizes[pageSizeVal] || pageSizes.a4;
-        if (orient === 'landscape') [pw,ph] = [ph,pw];
-
-        const pdf = new jsPDF({ unit: 'mm', format: [pw, ph], orientation: orient });
-        pdf.setFont(fontChoice, 'normal');
-        pdf.setFontSize(fontSizePt);
-
-        const availW = pw - marginMm * 2;
-        const lineH = fontSizePt * 0.3528 * lineSpacing; // pt to mm
-        let y = marginMm;
-
-        // Title
-        if (title) {
-          pdf.setFont(fontChoice, 'bold');
-          pdf.setFontSize(fontSizePt + 6);
-          const titleLines = pdf.splitTextToSize(title, availW);
-          pdf.text(titleLines, marginMm, y + (fontSizePt + 6) * 0.3528);
-          y += titleLines.length * (fontSizePt + 6) * 0.3528 * lineSpacing + 4;
-          pdf.setLineWidth(0.4);
-          pdf.setDrawColor(200,200,200);
-          pdf.line(marginMm, y, pw - marginMm, y);
-          y += 5;
-          pdf.setFont(fontChoice, 'normal');
-          pdf.setFontSize(fontSizePt);
+      const opt = {
+        margin:       marginMm,
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+        // auto page breaks when content hits the bottom of the page
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, 
+        jsPDF:        { 
+          unit: 'mm', 
+          format: document.getElementById('pageSize').value, 
+          orientation: document.getElementById('orientation').value 
         }
+      };
 
-        // Body text
-        const paragraphs = text.split('\n');
-        for (const para of paragraphs) {
-          const lines = pdf.splitTextToSize(para || ' ', availW);
-          for (const line of lines) {
-            if (y + lineH > ph - marginMm) {
-              pdf.addPage([pw, ph], orient);
-              y = marginMm;
-            }
-            pdf.text(line, marginMm, y + fontSizePt * 0.3528);
-            y += lineH;
-          }
-        }
-
-        // Footer on each page
-        const totalPages = pdf.internal.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-          pdf.setPage(i);
-          pdf.setFontSize(9);
-          pdf.setTextColor(160,160,160);
-          pdf.text(`Page ${i} of ${totalPages}`, pw / 2, ph - 8, { align: 'center' });
-          pdf.text('Created with PALMTOOLS', marginMm, ph - 8);
-          pdf.setTextColor(0,0,0);
-          pdf.setFontSize(fontSizePt);
-        }
-
-        const filename = (title || 'document').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,40);
-        pdf.save(`palmtools_${filename}.pdf`);
-
+      // Generate and save
+      html2pdf().set(opt).from(printContainer).save().then(() => {
+        document.body.removeChild(printContainer); // Cleanup
+        
         statusEl.className = 'status success fade-in';
         statusEl.innerHTML = '<div class="status-dot"></div>PDF downloaded successfully!';
-
-      } catch(err) {
-        console.error(err);
+        
+        btn.disabled = false;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download PDF`;
+      }).catch(err => {
+        document.body.removeChild(printContainer);
         statusEl.className = 'status error fade-in';
         statusEl.innerHTML = `<div class="status-dot"></div>Error: ${err.message}`;
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download PDF`;
+        btn.disabled = false;
+        btn.innerHTML = `Download PDF`;
+      });
     }
   </script>
 </body>

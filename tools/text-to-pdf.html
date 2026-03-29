@@ -189,7 +189,6 @@
       <p class="tool-subtitle">Write rich documents with formatting, images, headers, footers, cover pages, and page numbers — then export as a perfectly paginated PDF in any style.</p>
     </header>
 
-    <!-- ① TEMPLATE -->
     <div class="card">
       <div class="card-title">Template</div>
       <div class="theme-grid">
@@ -257,7 +256,6 @@
       </div>
     </div>
 
-    <!-- ② COVER PAGE -->
     <div class="card">
       <label class="toggle-row" for="coverToggle">
         <div class="toggle-info">
@@ -291,7 +289,6 @@
       </div>
     </div>
 
-    <!-- ③ CONTENT -->
     <div class="card">
       <div class="card-title">Document Content</div>
       <div class="field">
@@ -306,7 +303,6 @@
       </div>
     </div>
 
-    <!-- ④ PAGE SETTINGS -->
     <div class="card">
       <div class="card-title">Page Settings</div>
       <div class="grid-2">
@@ -369,7 +365,6 @@
       </div>
     </div>
 
-    <!-- ⑤ HEADER & FOOTER -->
     <div class="card">
       <div class="card-title">Header & Footer</div>
 
@@ -427,7 +422,6 @@
       </div>
     </div>
 
-    <!-- ⑥ PREVIEW -->
     <div class="card">
       <div class="card-title">Document Preview</div>
       <div class="actions">
@@ -443,7 +437,6 @@
       </div>
     </div>
 
-    <!-- ⑦ EXPORT -->
     <div class="card">
       <div class="card-title">Export</div>
       <div id="exportStatus" style="display:none;"></div>
@@ -614,7 +607,7 @@
   }
 
   // ── PDF ENGINE
-    function runPDF(action) {
+  function runPDF(action) {
     const contentHTML = quill.root.innerHTML;
     const hasContent  = quill.getText().trim().length > 0 || contentHTML.includes('<img');
     const statusEl    = document.getElementById('exportStatus');
@@ -776,125 +769,6 @@
       }
     });
   }
-
-    // Cover HTML
-    let coverHTML = '';
-    if (hasCover) {
-      coverHTML = theme.cover({
-        title:    document.getElementById('coverTitle').value    || 'Untitled Document',
-        subtitle: document.getElementById('coverSubtitle').value,
-        author:   document.getElementById('coverAuthor').value,
-        date:     document.getElementById('coverDate').value
-      });
-    }
-
-    // Off-screen render container
-    // FIX: position:absolute + left:-9999px — keeps element in layout tree so
-    // html2canvas can capture it. position:fixed/top:100% causes blank output.
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;z-index:-9999;';
-
-    const container = document.createElement('div');
-    container.style.cssText = `font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};background:${theme.pageBg};color:${theme.textColor};${theme.bodyExtra}`;
-
-    container.innerHTML = `
-      ${coverHTML}
-      <div class="ql-editor" style="padding:${marginMm * 1.5}px;font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};color:${theme.textColor};background:${theme.pageBg};min-height:1000px;${theme.bodyExtra}">${contentHTML}</div>
-    `;
-
-    container.querySelectorAll('img').forEach(img => { img.style.maxWidth = '100%'; img.style.height = 'auto'; });
-    container.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => { h.style.color = theme.headColor; });
-
-    wrap.appendChild(container);
-    document.body.appendChild(wrap);
-
-    const hasHdr = !!hdrText;
-    const hasFtr = ftrText || showPN;
-
-    const opt = {
-      margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
-      filename,
-      image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg },
-      pagebreak:   { mode: ['avoid-all','css','legacy'] },
-      jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
-    };
-
-    const cleanup = () => { if (document.body.contains(wrap)) document.body.removeChild(wrap); };
-
-    html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
-      const total = pdf.internal.getNumberOfPages();
-      const pgW   = pdf.internal.pageSize.getWidth();
-      const pgH   = pdf.internal.pageSize.getHeight();
-      const mm    = marginMm;
-      const isDark   = currentTheme === 'dark';
-      const lineRGB  = isDark ? [55,75,105]    : [210,210,210];
-      const txtRGB   = isDark ? [110,135,165]  : [150,150,150];
-
-      for (let i = 1; i <= total; i++) {
-        pdf.setPage(i);
-        const isCoverPage = hasCover && i === 1;
-        if (isCoverPage) continue;
-
-        // Header
-        if (hasHdr) {
-          pdf.setFontSize(8.5);
-          pdf.setTextColor(...txtRGB);
-          const hX = headerAlign === 'center' ? pgW/2 : headerAlign === 'right' ? pgW - mm : mm;
-          pdf.text(hdrText, hX, 7, { align: headerAlign });
-          pdf.setDrawColor(...lineRGB);
-          pdf.setLineWidth(0.28);
-          pdf.line(mm, 9.5, pgW - mm, 9.5);
-        }
-
-        // Footer
-        if (hasFtr) {
-          pdf.setDrawColor(...lineRGB);
-          pdf.setLineWidth(0.28);
-          pdf.line(mm, pgH - 11, pgW - mm, pgH - 11);
-          pdf.setFontSize(8.5);
-          pdf.setTextColor(...txtRGB);
-
-          if (ftrText) {
-            pdf.text(ftrText, mm, pgH - 7.5, { align: 'left' });
-          }
-
-          if (showPN) {
-            const n = hasCover ? i - 1 : i;
-            const t = hasCover ? total - 1 : total;
-            const label = pnFormat.replace('{n}', n).replace('{t}', t);
-            const pX = pnPos === 'left' ? mm : pnPos === 'right' ? pgW - mm : pgW / 2;
-            pdf.text(label, pX, pgH - 7.5, { align: pnPos });
-          }
-        }
-      }
-
-      if (action === 'preview') {
-        document.getElementById('previewWrapper').style.display = 'block';
-        document.getElementById('pdfIframe').src = pdf.output('bloburl');
-        cleanup();
-        btn.disabled  = false;
-        btn.innerHTML = origHTML;
-      } else {
-        pdf.save(filename);
-        cleanup();
-        statusEl.className = 'status success fade-in';
-        statusEl.innerHTML  = '<div class="status-dot"></div>PDF downloaded successfully!';
-        btn.disabled  = false;
-        btn.innerHTML = origHTML;
-      }
-    }).catch(err => {
-      cleanup();
-      btn.disabled  = false;
-      btn.innerHTML = origHTML;
-      if (action === 'save') {
-        statusEl.className = 'status error fade-in';
-        statusEl.innerHTML  = `<div class="status-dot"></div>Error: ${err.message}`;
-      } else {
-        alert('Error: ' + err.message);
-      }
-    });
-  }
   </script>
 </body>
-              </html>
+</html>

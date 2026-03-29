@@ -356,9 +356,49 @@
     @media (max-width: 380px) {
       .tools-grid { grid-template-columns: 1fr; }
     }
-  </style>
+       
+  .tool-submission-box {
+    display: block;
+    width: 320px;
+    padding: 20px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-family: sans-serif;
+    text-decoration: none;
+    color: #374151;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .tool-submission-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    border-color: #d1d5db;
+  }
+
+  .tool-submission-box strong {
+    display: block;
+    font-size: 1.1rem;
+    color: #111827;
+    margin-bottom: 8px;
+  }
+
+  .tool-submission-box p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+</style>
+
+
+
 </head>
 <body>
+     <a href="msg-us.html" class="tool-submission-box">
+  <strong>Submit Tools & Feedback</strong>
+  <p>This is the link where you can send your own tools to us, and share your suggestions on how we can improve.</p>
+     </a>
 
   <div class="hub-bg">
     <div class="hub-bg-orb hub-bg-orb-1"></div>

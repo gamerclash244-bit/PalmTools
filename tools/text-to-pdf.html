@@ -614,7 +614,7 @@
   }
 
   // ── PDF ENGINE
-  function runPDF(action) {
+    function runPDF(action) {
     const contentHTML = quill.root.innerHTML;
     const hasContent  = quill.getText().trim().length > 0 || contentHTML.includes('<img');
     const statusEl    = document.getElementById('exportStatus');
@@ -653,6 +653,129 @@
     const hasCover   = document.getElementById('coverToggle').checked;
     const filename   = (document.getElementById('docFilename').value.trim() || 'palmtools_document')
                          .toLowerCase().replace(/[^a-z0-9]+/g,'_') + '.pdf';
+
+    // Cover HTML
+    let coverHTML = '';
+    if (hasCover) {
+      coverHTML = theme.cover({
+        title:    document.getElementById('coverTitle').value    || 'Untitled Document',
+        subtitle: document.getElementById('coverSubtitle').value,
+        author:   document.getElementById('coverAuthor').value,
+        date:     document.getElementById('coverDate').value
+      });
+    }
+
+    // FIX 1: Create the container but DO NOT attach it to the body.
+    // html2pdf natively handles cloning unattached elements into a hidden iframe.
+    const container = document.createElement('div');
+    container.style.cssText = `font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};background:${theme.pageBg};color:${theme.textColor};${theme.bodyExtra}`;
+
+    container.innerHTML = `
+      ${coverHTML}
+      <div class="ql-editor" style="padding:${marginMm * 1.5}px;font-family:${fontFamily};font-size:${fontSize};line-height:${lineHeight};color:${theme.textColor};background:${theme.pageBg};min-height:1000px;${theme.bodyExtra}">${contentHTML}</div>
+    `;
+
+    const hasHdr = !!hdrText;
+    const hasFtr = ftrText || showPN;
+
+    const opt = {
+      margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
+      filename,
+      image:       { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: theme.pageBg },
+      pagebreak:   { mode: ['avoid-all','css','legacy'] },
+      jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
+    };
+
+    html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
+      const total = pdf.internal.getNumberOfPages();
+      const pgW   = pdf.internal.pageSize.getWidth();
+      const pgH   = pdf.internal.pageSize.getHeight();
+      const mm    = marginMm;
+      const isDark   = currentTheme === 'dark';
+      const lineRGB  = isDark ? [55,75,105]    : [210,210,210];
+      const txtRGB   = isDark ? [110,135,165]  : [150,150,150];
+
+      for (let i = 1; i <= total; i++) {
+        pdf.setPage(i);
+        const isCoverPage = hasCover && i === 1;
+        if (isCoverPage) continue;
+
+        if (hasHdr) {
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(...txtRGB);
+          const hX = headerAlign === 'center' ? pgW/2 : headerAlign === 'right' ? pgW - mm : mm;
+          pdf.text(hdrText, hX, 7, { align: headerAlign });
+          pdf.setDrawColor(...lineRGB);
+          pdf.setLineWidth(0.28);
+          pdf.line(mm, 9.5, pgW - mm, 9.5);
+        }
+
+        if (hasFtr) {
+          pdf.setDrawColor(...lineRGB);
+          pdf.setLineWidth(0.28);
+          pdf.line(mm, pgH - 11, pgW - mm, pgH - 11);
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(...txtRGB);
+
+          if (ftrText) {
+            pdf.text(ftrText, mm, pgH - 7.5, { align: 'left' });
+          }
+
+          if (showPN) {
+            const n = hasCover ? i - 1 : i;
+            const t = hasCover ? total - 1 : total;
+            const label = pnFormat.replace('{n}', n).replace('{t}', t);
+            const pX = pnPos === 'left' ? mm : pnPos === 'right' ? pgW - mm : pgW / 2;
+            pdf.text(label, pX, pgH - 7.5, { align: pnPos });
+          }
+        }
+      }
+
+      if (action === 'preview') {
+        const blobUrl = pdf.output('bloburl');
+        const previewWrapper = document.getElementById('previewWrapper');
+        
+        // FIX 2: Detect mobile and fallback to a direct link instead of an iframe
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          previewWrapper.innerHTML = `
+            <div style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px;">
+              <p style="color: var(--text-muted); margin-bottom: 16px;">Mobile browsers do not support inline PDF previews.</p>
+              <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
+            </div>
+          `;
+        } else {
+          previewWrapper.innerHTML = `
+            <div class="preview-frame">
+              <iframe id="pdfIframe" style="width:100%;height:100%;border:none;"></iframe>
+            </div>
+          `;
+          document.getElementById('pdfIframe').src = blobUrl;
+        }
+
+        previewWrapper.style.display = 'block';
+        btn.disabled  = false;
+        btn.innerHTML = origHTML;
+      } else {
+        pdf.save(filename);
+        statusEl.className = 'status success fade-in';
+        statusEl.innerHTML  = '<div class="status-dot"></div>PDF downloaded successfully!';
+        btn.disabled  = false;
+        btn.innerHTML = origHTML;
+      }
+    }).catch(err => {
+      btn.disabled  = false;
+      btn.innerHTML = origHTML;
+      if (action === 'save') {
+        statusEl.className = 'status error fade-in';
+        statusEl.innerHTML  = `<div class="status-dot"></div>Error: ${err.message}`;
+      } else {
+        alert('Error: ' + err.message);
+      }
+    });
+  }
 
     // Cover HTML
     let coverHTML = '';

@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Text to PDF — PALMTOOLS</title>
+  
   <link rel="stylesheet" href="../shared.css"/>
   <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
@@ -136,7 +137,7 @@
     .pn-opt:hover { border-color: var(--orange); color: var(--orange); }
     .pn-opt.active { border-color: var(--orange); background: var(--orange-glow); color: var(--orange); }
 
-    /* ── QUILL ── */
+    /* ── QUILL EDITOR ── */
     .editor-wrapper { border-radius: 12px; overflow: hidden; margin-top: 8px; }
     .ql-toolbar.ql-snow {
       border: 1.5px solid var(--border-subtle); border-bottom: none;
@@ -161,13 +162,6 @@
     .ql-snow.ql-toolbar button:hover .ql-stroke, .ql-snow .ql-toolbar button.ql-active .ql-stroke,
     .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke { stroke: var(--orange); }
     .ql-snow.ql-toolbar button:hover .ql-fill, .ql-snow .ql-toolbar button.ql-active .ql-fill { fill: var(--orange); }
-
-    /* ── PREVIEW ── */
-    .preview-frame {
-      margin-top: 18px; height: 640px;
-      border: 1.5px solid var(--border-subtle); border-radius: 12px;
-      overflow: hidden; background: var(--bg-2);
-    }
 
     .section-rule { border: none; border-top: 1px solid var(--border-subtle); margin: 18px 0; }
   </style>
@@ -431,11 +425,7 @@
         </button>
       </div>
       <div id="previewWrapper" style="display:none;">
-        <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: auto;">
-          <p style="color: var(--text-muted); margin-bottom: 16px; font-family: 'DM Sans', sans-serif;">Your document is ready to preview.</p>
-          <a id="previewLinkBtn" href="#" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex;">Open Preview in New Tab</a>
         </div>
-      </div>
     </div>
 
     <div class="card">
@@ -607,10 +597,12 @@
     document.getElementById('exportStatus').style.display  = 'none';
   }
 
-  // ── PDF ENGINE
+  // ── PDF ENGINE: REBUILT FROM SCRATCH
   function runPDF(action) {
     const contentHTML = quill.root.innerHTML;
-    const hasContent  = quill.getText().trim().length > 0 || contentHTML.includes('<img');
+    const textContent = quill.getText().trim();
+    // Validate we actually have something to print
+    const hasContent  = textContent.length > 0 || contentHTML.includes('<img');
     const statusEl    = document.getElementById('exportStatus');
     const btn         = document.getElementById(action === 'preview' ? 'previewBtn' : 'exportBtn');
     const origHTML    = btn.innerHTML;
@@ -626,6 +618,7 @@
       return;
     }
 
+    // Set Loading UI
     btn.disabled  = true;
     btn.innerHTML = `<div class="spinner"></div>${action === 'preview' ? 'Rendering…' : 'Generating…'}`;
     if (action === 'save') {
@@ -634,6 +627,7 @@
       statusEl.innerHTML  = '<div class="status-dot"></div>Building your PDF…';
     }
 
+    // Capture User Inputs
     const theme      = THEMES[currentTheme];
     const fontFamily = document.getElementById('fontFamily').value;
     const fontSize   = document.getElementById('bodyFontSize').value;
@@ -658,49 +652,61 @@
       });
     }
 
-    // ── FIX 1: MOBILE OFF-SCREEN RENDER BUG ──
-    // Mobile browsers flat-out refuse to paint elements placed off-screen (left: -9999px).
-    // We place it at top: 0, left: 0 so the browser MUST paint it. 
-    // We hide it behind the app UI using z-index: -9999 and pointer-events: none.
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `position: absolute; top: 0; left: 0; width: 800px; z-index: -9999; pointer-events: none; background: ${theme.pageBg};`;
-
-    const container = document.createElement('div');
-    container.style.cssText = `font-family:${fontFamily}; font-size:${fontSize}; line-height:${lineHeight}; color:${theme.textColor};`;
-
-    container.innerHTML = `
-      ${coverHTML}
-      <div class="ql-editor" style="padding:${marginMm * 1.5}px;">
-        ${contentHTML}
+    // THE FIX:
+    // We construct a raw HTML string and hand it DIRECTLY to html2pdf. 
+    // This entirely skips the buggy DOM injection + offscreen Mobile canvas limits.
+    // We also inject CSS to OVERRIDE Quill's 'overflow-y: auto' class which breaks page breaks.
+    const exportHTML = `
+      <div id="pdf-export-wrapper" style="
+        font-family: ${fontFamily}; 
+        font-size: ${fontSize}; 
+        line-height: ${lineHeight}; 
+        background-color: ${theme.pageBg}; 
+        color: ${theme.textColor}; 
+        ${theme.bodyExtra}
+      ">
+        <style>
+          /* 1. Stop html2canvas from rendering a blank 0-height scroll box */
+          #pdf-export-wrapper .ql-editor {
+            overflow: visible !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: ${marginMm * 1.5}px !important;
+          }
+          /* 2. Force text to match template so dark mode doesn't print invisible white text */
+          #pdf-export-wrapper .ql-editor p,
+          #pdf-export-wrapper .ql-editor li,
+          #pdf-export-wrapper .ql-editor div,
+          #pdf-export-wrapper .ql-editor blockquote {
+            color: ${theme.textColor};
+          }
+          #pdf-export-wrapper .ql-editor h1,
+          #pdf-export-wrapper .ql-editor h2,
+          #pdf-export-wrapper .ql-editor h3,
+          #pdf-export-wrapper .ql-editor h4,
+          #pdf-export-wrapper .ql-editor h5,
+          #pdf-export-wrapper .ql-editor h6 {
+            color: ${theme.headColor};
+          }
+          /* Protect images */
+          #pdf-export-wrapper .ql-editor img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+          }
+        </style>
+        
+        ${coverHTML}
+        
+        <div class="ql-editor">
+          ${contentHTML}
+        </div>
       </div>
     `;
-
-    // ── FIX 2: DARK MODE INVISIBLE TEXT BUG ──
-    // Because the app is in dark mode, the text is white. White text on a white PDF = invisible.
-    // We explicitly overwrite the style of EVERY element with the correct theme color, 
-    // BUT we skip any element you intentionally colored red/blue/etc inside the Quill Editor.
-    const allNodes = container.querySelectorAll('*');
-    for (let i = 0; i < allNodes.length; i++) {
-      const node = allNodes[i];
-      // Skip if it has an inline color (protects custom Quill text colors)
-      if (node.style && node.style.color) continue; 
-      
-      if (node.tagName.match(/^H[1-6]$/i)) {
-        node.style.color = theme.headColor;
-      } else if (['P', 'SPAN', 'DIV', 'LI', 'A', 'BLOCKQUOTE', 'STRONG', 'EM'].includes(node.tagName)) {
-        node.style.color = theme.textColor;
-      }
-    }
-
-    container.querySelectorAll('img').forEach(img => { img.style.maxWidth = '100%'; img.style.height = 'auto'; });
-
-    wrap.appendChild(container);
-    document.body.appendChild(wrap);
 
     const hasHdr = !!hdrText;
     const hasFtr = ftrText || showPN;
 
-    // Notice we REMOVED the 'avoid-all' setting to stop huge chunks of text from disappearing
     const opt = {
       margin:      [marginMm + (hasHdr ? 12 : 0), marginMm, marginMm + (hasFtr ? 12 : 0), marginMm],
       filename:    filename,
@@ -710,9 +716,8 @@
       jsPDF:       { unit: 'mm', format: pageSize, orientation: orient }
     };
 
-    const cleanup = () => { if (document.body.contains(wrap)) document.body.removeChild(wrap); };
-
-    html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => {
+    // Feed html2pdf the raw string (safest method)
+    html2pdf().set(opt).from(exportHTML).toPdf().get('pdf').then(pdf => {
       const total = pdf.internal.getNumberOfPages();
       const pgW   = pdf.internal.pageSize.getWidth();
       const pgH   = pdf.internal.pageSize.getHeight();
@@ -721,6 +726,7 @@
       const lineRGB  = isDark ? [55,75,105]    : [210,210,210];
       const txtRGB   = isDark ? [110,135,165]  : [150,150,150];
 
+      // Draw Headers and Footers
       for (let i = 1; i <= total; i++) {
         pdf.setPage(i);
         const isCoverPage = hasCover && i === 1;
@@ -759,21 +765,27 @@
 
       if (action === 'preview') {
         const blobUrl = pdf.output('bloburl');
-        document.getElementById('previewLinkBtn').href = blobUrl;
-        document.getElementById('previewWrapper').style.display = 'block';
-        cleanup();
+        const previewWrapper = document.getElementById('previewWrapper');
+        
+        previewWrapper.innerHTML = `
+          <div class="preview-frame" style="padding: 40px 20px; text-align: center; border: 1.5px dashed var(--border-subtle); border-radius: 12px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: auto; background: var(--bg-2);">
+            <p style="color: var(--text); margin-bottom: 8px; font-weight: 600; font-family: 'DM Sans', sans-serif;">Preview Ready</p>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px; font-family: 'DM Sans', sans-serif;">Tap below to open your document securely.</p>
+            <a href="${blobUrl}" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex; width: auto;">Open PDF in New Tab</a>
+          </div>
+        `;
+        
+        previewWrapper.style.display = 'block';
         btn.disabled  = false;
         btn.innerHTML = origHTML;
       } else {
         pdf.save(filename);
-        cleanup();
         statusEl.className = 'status success fade-in';
         statusEl.innerHTML  = '<div class="status-dot"></div>PDF downloaded successfully!';
         btn.disabled  = false;
         btn.innerHTML = origHTML;
       }
     }).catch(err => {
-      cleanup();
       btn.disabled  = false;
       btn.innerHTML = origHTML;
       if (action === 'save') {

@@ -6,83 +6,13 @@
   <title>Contact & Contribute — PALMTOOLS</title>
   <link rel="stylesheet" href="shared.css"/>
   <style>
-    /* Tab Navigation */
-    .tab-nav {
-      display: flex;
-      background: var(--surface);
-      border: 1.5px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 6px;
-      margin-bottom: 32px;
-      gap: 6px;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 12px;
-      text-align: center;
-      border-radius: 10px;
-      border: none;
-      background: transparent;
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 15px;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tab-btn:hover {
-      color: var(--text);
-      background: var(--bg-2);
-    }
-    .tab-btn.active {
-      background: linear-gradient(135deg, var(--orange), var(--amber));
-      color: white;
-      box-shadow: 0 4px 12px rgba(249,115,22,0.25);
-    }
-
-    /* Form Panels */
-    .tab-panel {
-      display: none;
-      animation: fadeIn 0.4s ease;
-    }
-    .tab-panel.active {
-      display: block;
-    }
-
-    /* Video Upload Specifics */
-    .video-preview-wrap {
-      margin-top: 16px;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1.5px solid var(--border-subtle);
-      display: none;
-      background: var(--bg);
-    }
-    .video-preview-wrap video {
-      width: 100%;
-      display: block;
-      max-height: 300px;
-      object-fit: contain;
-    }
-    .video-preview-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 16px;
-      background: var(--surface-2);
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .remove-video-btn {
-      color: #dc2626;
-      background: none;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .remove-video-btn:hover { text-decoration: underline; }
+    .tab-nav { display: flex; background: var(--surface); border: 1.5px solid var(--border-subtle); border-radius: 16px; padding: 6px; margin-bottom: 32px; gap: 6px; }
+    .tab-btn { flex: 1; padding: 12px; text-align: center; border-radius: 10px; border: none; background: transparent; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text); background: var(--bg-2); }
+    .tab-btn.active { background: linear-gradient(135deg, var(--orange), var(--amber)); color: white; box-shadow: 0 4px 12px rgba(249,115,22,0.25); }
+    .tab-panel { display: none; animation: fadeIn 0.4s ease; }
+    .tab-panel.active { display: block; }
+    .info-box { padding: 16px; background: var(--orange-glow); border: 1px solid var(--orange); border-radius: 12px; margin-bottom: 20px; font-size: 13.5px; color: var(--text); display: flex; gap: 12px; align-items: flex-start; }
   </style>
 </head>
 <body>
@@ -106,121 +36,76 @@
     </div>
 
     <div id="tab-message" class="tab-panel active">
-      <form class="card" id="formMessage" onsubmit="submitForm(event, 'message')">
+      <form class="card" id="formMessage" onsubmit="submitToGoogle(event, 'message')">
         <div class="card-title">How can we help?</div>
-        
         <div class="row">
           <div class="col field">
             <label class="label">Your Name</label>
-            <input type="text" class="input" required placeholder="John Doe" />
+            <input type="text" name="entry.111111" class="input" required placeholder="John Doe" />
           </div>
           <div class="col field">
             <label class="label">Email Address</label>
-            <input type="email" class="input" required placeholder="john@example.com" />
+            <input type="email" name="entry.222222" class="input" required placeholder="john@example.com" />
           </div>
         </div>
-
-        <div class="field">
-          <label class="label">Topic</label>
-          <select class="input" required>
-            <option value="" disabled selected>Select a topic...</option>
-            <option value="bug">Report a Bug / Issue</option>
-            <option value="feature">Request a New Feature</option>
-            <option value="feedback">General Feedback</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
         <div class="field">
           <label class="label">Message / Details</label>
-          <textarea class="input" rows="5" required placeholder="Please describe your issue or need in detail..."></textarea>
+          <textarea name="entry.333333" class="input" rows="5" required placeholder="Please describe your issue or need in detail..."></textarea>
         </div>
-
         <div id="statusMessage" style="display:none; margin-bottom: 20px;"></div>
-
         <div class="actions">
-          <button type="submit" class="btn btn-primary" id="btnMessage">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Send Message
-          </button>
+          <button type="submit" class="btn btn-primary" id="btnMessage">Send Message</button>
         </div>
       </form>
     </div>
 
     <div id="tab-contribute" class="tab-panel">
-      <form class="card" id="formContribute" onsubmit="submitForm(event, 'contribute')">
+      <form class="card" id="formContribute" onsubmit="submitToGoogle(event, 'contribute')">
         <div class="card-title">Share your creation</div>
         
+        <div class="info-box">
+          <span style="font-size: 20px;">🎥</span>
+          <div>
+            <strong>Video Submission Process:</strong> Submitting this form will send us your tool's details and automatically open your email app so you can attach your screen recording to send to <strong>palmtools@gmail.com</strong>.
+          </div>
+        </div>
+
         <div class="row">
           <div class="col field">
             <label class="label">Developer Name</label>
-            <input type="text" class="input" required placeholder="Your Name or Alias" />
+            <input type="text" name="entry.444444" id="devName" class="input" required placeholder="Your Name or Alias" />
           </div>
           <div class="col field">
             <label class="label">Contact Email</label>
-            <input type="email" class="input" required placeholder="For follow-up questions" />
+            <input type="email" name="entry.555555" class="input" required placeholder="For follow-up questions" />
           </div>
         </div>
-
         <div class="row">
           <div class="col field">
             <label class="label">Tool Name</label>
-            <input type="text" class="input" required placeholder="e.g., SVG Optimizer" />
-          </div>
-          <div class="col field">
-            <label class="label">Source Code / GitHub (Optional)</label>
-            <input type="url" class="input" placeholder="https://github.com/..." />
+            <input type="text" name="entry.666666" id="toolName" class="input" required placeholder="e.g., SVG Optimizer" />
           </div>
         </div>
-
         <div class="field">
-          <label class="label">Tool Description</label>
-          <textarea class="input" rows="3" required placeholder="What does this tool do? What libraries does it use? Keep in mind it must run 100% client-side."></textarea>
-        </div>
-
-        <div class="field">
-          <label class="label">Screen Record of your tool in action</label>
-          <div class="drop-zone" id="videoDropZone" onclick="document.getElementById('videoInput').click()">
-            <input type="file" id="videoInput" accept="video/*" required onchange="handleVideoUpload(this)" />
-            <div class="drop-zone-icon">🎥</div>
-            <h3>Upload Screen Recording</h3>
-            <p>MP4, WebM, or MOV · Max 50MB</p>
-          </div>
-          
-          <div class="video-preview-wrap" id="videoPreviewWrap">
-            <div class="video-preview-header">
-              <span id="videoFilename">video.mp4</span>
-              <button type="button" class="remove-video-btn" onclick="removeVideo(event)">Remove</button>
-            </div>
-            <video id="videoPlayer" controls></video>
-          </div>
+          <label class="label">Tool Description & Code Link</label>
+          <textarea name="entry.777777" class="input" rows="3" required placeholder="Paste your GitHub link and describe what the tool does..."></textarea>
         </div>
 
         <div id="statusContribute" style="display:none; margin-bottom: 20px;"></div>
-
         <div class="actions">
-          <button type="submit" class="btn btn-primary" id="btnContribute">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Submit Tool
-          </button>
+          <button type="submit" class="btn btn-primary" id="btnContribute">Submit Tool & Email Video</button>
         </div>
       </form>
     </div>
-
   </div>
 
   <script>
-    // Tab Switching Logic
     function switchTab(tabId) {
-      // Update Buttons
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
-
-      // Update Panels
       document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
       document.getElementById('tab-' + tabId).classList.add('active');
 
-      // Update Header Text dynamically
       const icon = document.getElementById('headerIcon');
       const title = document.getElementById('headerTitle');
       const sub = document.getElementById('headerSub');
@@ -228,7 +113,7 @@
       if (tabId === 'message') {
         icon.textContent = '👋';
         title.innerHTML = 'Get in <span class="accent">Touch</span>';
-        sub.textContent = 'Have a question, found a bug, or just want to say hi? Let us know!';
+        sub.textContent = 'Have a question, found a bug, or want to contribute your own tool? Let us know!';
       } else {
         icon.textContent = '🚀';
         title.innerHTML = 'Contribute a <span class="accent">Tool</span>';
@@ -236,87 +121,64 @@
       }
     }
 
-    // Video Upload Logic
-    let currentVideoUrl = null;
-
-    function handleVideoUpload(input) {
-      if (input.files && input.files[0]) {
-        const file = input.files[0];
-        
-        // Optional: Check file size (e.g., limit to 50MB)
-        if (file.size > 50 * 1024 * 1024) {
-          alert('Video is too large. Please upload a file smaller than 50MB.');
-          input.value = '';
-          return;
-        }
-
-        // Generate preview
-        if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
-        currentVideoUrl = URL.createObjectURL(file);
-        
-        document.getElementById('videoPlayer').src = currentVideoUrl;
-        document.getElementById('videoFilename').textContent = file.name;
-        
-        // Swap UI
-        document.getElementById('videoDropZone').style.display = 'none';
-        document.getElementById('videoPreviewWrap').style.display = 'block';
-      }
-    }
-
-    function removeVideo(e) {
-      e.stopPropagation(); // prevent triggering the dropzone click
-      const input = document.getElementById('videoInput');
-      input.value = '';
+    // Google Form Submission Handler
+    function submitToGoogle(e, type) {
+      e.preventDefault();
       
-      if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
-      currentVideoUrl = null;
-      document.getElementById('videoPlayer').src = '';
-      
-      // Swap UI back
-      document.getElementById('videoDropZone').style.display = 'block';
-      document.getElementById('videoPreviewWrap').style.display = 'none';
-    }
-
-    // Form Submission Simulation
-    function submitForm(e, type) {
-      e.preventDefault(); // Prevent page reload
-      
+      const form = e.target;
       const btn = type === 'message' ? document.getElementById('btnMessage') : document.getElementById('btnContribute');
       const status = type === 'message' ? document.getElementById('statusMessage') : document.getElementById('statusContribute');
-      const form = type === 'message' ? document.getElementById('formMessage') : document.getElementById('formContribute');
       const originalText = btn.innerHTML;
 
-      // Loading State
-      btn.disabled = true;
-      btn.innerHTML = `<div class="spinner"></div> Sending...`;
-      
-      status.style.display = 'none';
-      status.className = '';
+      // =========================================================================
+      // IMPORTANT: YOU MUST REPLACE THIS URL WITH YOUR SPECIFIC FORM RESPONSE URL
+      // =========================================================================
+      // It should look like: https://docs.google.com/forms/d/e/YOUR_LONG_ID/formResponse
+      const googleFormURL = 'https://docs.google.com/forms/d/e/1FAIpQLScgdIClR6Oq7k_AHF0K84ZzQQ-tEqF2HvL_G7kw7iKc-W78CA/formResponse';
 
-      // Simulate a network request (1.5 seconds)
-      setTimeout(() => {
-        // Success State
+      btn.disabled = true;
+      btn.innerHTML = `<div class="spinner"></div> Processing...`;
+      status.style.display = 'none';
+
+      const formData = new FormData(form);
+
+      // Send to Google silently
+      fetch(googleFormURL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      })
+      .then(() => {
         btn.innerHTML = originalText;
         btn.disabled = false;
-        
         status.style.display = 'flex';
         status.className = 'status success fade-in';
         
-        if(type === 'message') {
-          status.innerHTML = `<div class="status-dot"></div>Message sent successfully! We'll get back to you soon.`;
+        if (type === 'message') {
+          status.innerHTML = `<div class="status-dot"></div>Message sent successfully!`;
         } else {
-          status.innerHTML = `<div class="status-dot"></div>Tool submitted! Our team will review your video and reach out.`;
-          removeVideo(new Event('click')); // Clear video preview
+          status.innerHTML = `<div class="status-dot"></div>Tool details sent! Opening your email to attach the video...`;
+          
+          // Trigger Email App for the Video
+          const tName = document.getElementById('toolName').value;
+          const dName = document.getElementById('devName').value;
+          const subject = encodeURIComponent(`Tool Submission Video: ${tName} by ${dName}`);
+          const body = encodeURIComponent(`Hi PALMTOOLS team,\n\nI just submitted the form for my tool "${tName}". \n\nPlease find my screen recording attached below!\n\nThanks,\n${dName}`);
+          
+          // Opens user's default email client
+          window.location.href = `mailto:palmtools@gmail.com?subject=${subject}&body=${body}`;
         }
         
-        form.reset(); // Clear the form fields
-        
-        // Hide success message after 5 seconds
-        setTimeout(() => {
-          status.style.display = 'none';
-        }, 5000);
-
-      }, 1500);
+        form.reset();
+        setTimeout(() => { status.style.display = 'none'; }, 6000);
+      })
+      .catch((err) => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        status.style.display = 'flex';
+        status.className = 'status error fade-in';
+        status.innerHTML = `<div class="status-dot"></div>Connection error. Please try again.`;
+      });
     }
   </script>
 </body>

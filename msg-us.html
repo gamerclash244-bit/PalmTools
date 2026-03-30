@@ -97,23 +97,19 @@
           <textarea name="entry.TOOL_DESC_ID" class="input" rows="3" required placeholder="What does this tool do?"></textarea>
         </div>
 
-        <div class="row">
-          <div class="col field">
-            <label class="label">Licensing / Terms</label>
-            <select name="entry.PAID_OR_OPEN_ID" class="input" required>
-              <option value="" disabled selected>Select an option...</option>
-              <option value="Open Source (Free)">Open Source (Free)</option>
-              <option value="Paid (One-time)">Paid (One-time purchase)</option>
-              <option value="Paid (Subscription)">Paid (Subscription)</option>
-              <option value="Negotiable">Negotiable</option>
-            </select>
-          </div>
-          <div class="col field">
-            <label class="label">Expected Price (if applicable)</label>
-            <input type="text" name="entry.PRICE_ID" class="input" placeholder="e.g., Free, $50, $5/mo" />
-          </div>
+        <div class="field" style="margin-bottom: 24px;">
+          <label class="label">Developer Agreement</label>
+          <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; line-height: 1.5;">
+            <input type="checkbox" name="entry.AGREEMENT_ID" required style="margin-top: 3px; accent-color: var(--orange); width: 16px; height: 16px; flex-shrink: 0;" />
+            <span>I agree to the <a href="privacy.html" target="_blank" style="color: var(--orange); text-decoration: underline; font-weight: 600;">Privacy Policy</a>. I understand that if acquired, my tool will be integrated into PALMTOOLS and provided entirely free of charge to all users.</span>
+          </label>
         </div>
-
+        
+        <div class="field">
+          <label class="label">Expected Acquisition Price</label>
+          <input type="text" name="entry.PRICE_ID" class="input" placeholder="How much should the PALMTOOLS Group pay to buy the rights to this tool? (e.g., $500, Negotiable)" />
+        </div>
+        
         <div id="statusContribute" style="display:none; margin-bottom: 20px;"></div>
         <div class="actions">
           <button type="submit" class="btn btn-primary" id="btnContribute">Submit Tool & Email Video</button>

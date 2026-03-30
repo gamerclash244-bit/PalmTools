@@ -41,16 +41,16 @@
         <div class="row">
           <div class="col field">
             <label class="label">Your Name</label>
-            <input type="text" name="entry.111111" class="input" required placeholder="John Doe" />
+            <input type="text" name="entry.MESSAGE_NAME_ID" class="input" required placeholder="John Doe" />
           </div>
           <div class="col field">
             <label class="label">Email Address</label>
-            <input type="email" name="entry.222222" class="input" required placeholder="john@example.com" />
+            <input type="email" name="entry.MESSAGE_EMAIL_ID" class="input" required placeholder="john@example.com" />
           </div>
         </div>
         <div class="field">
           <label class="label">Message / Details</label>
-          <textarea name="entry.333333" class="input" rows="5" required placeholder="Please describe your issue or need in detail..."></textarea>
+          <textarea name="entry.MESSAGE_TEXT_ID" class="input" rows="5" required placeholder="Please describe your issue or need in detail..."></textarea>
         </div>
         <div id="statusMessage" style="display:none; margin-bottom: 20px;"></div>
         <div class="actions">
@@ -73,22 +73,45 @@
         <div class="row">
           <div class="col field">
             <label class="label">Developer Name</label>
-            <input type="text" name="entry.444444" id="devName" class="input" required placeholder="Your Name or Alias" />
+            <input type="text" name="entry.DEV_NAME_ID" id="devName" class="input" required placeholder="Your Name or Alias" />
           </div>
           <div class="col field">
             <label class="label">Contact Email</label>
-            <input type="email" name="entry.555555" class="input" required placeholder="For follow-up questions" />
+            <input type="email" name="entry.DEV_EMAIL_ID" class="input" required placeholder="For follow-up questions" />
           </div>
         </div>
+        
         <div class="row">
           <div class="col field">
             <label class="label">Tool Name</label>
-            <input type="text" name="entry.666666" id="toolName" class="input" required placeholder="e.g., SVG Optimizer" />
+            <input type="text" name="entry.TOOL_NAME_ID" id="toolName" class="input" required placeholder="e.g., SVG Optimizer" />
+          </div>
+          <div class="col field">
+            <label class="label">GitHub / Source Code Link</label>
+            <input type="url" name="entry.GITHUB_LINK_ID" class="input" placeholder="https://github.com/..." />
           </div>
         </div>
+
         <div class="field">
-          <label class="label">Tool Description & Code Link</label>
-          <textarea name="entry.777777" class="input" rows="3" required placeholder="Paste your GitHub link and describe what the tool does..."></textarea>
+          <label class="label">Tool Description</label>
+          <textarea name="entry.TOOL_DESC_ID" class="input" rows="3" required placeholder="What does this tool do?"></textarea>
+        </div>
+
+        <div class="row">
+          <div class="col field">
+            <label class="label">Licensing / Terms</label>
+            <select name="entry.PAID_OR_OPEN_ID" class="input" required>
+              <option value="" disabled selected>Select an option...</option>
+              <option value="Open Source (Free)">Open Source (Free)</option>
+              <option value="Paid (One-time)">Paid (One-time purchase)</option>
+              <option value="Paid (Subscription)">Paid (Subscription)</option>
+              <option value="Negotiable">Negotiable</option>
+            </select>
+          </div>
+          <div class="col field">
+            <label class="label">Expected Price (if applicable)</label>
+            <input type="text" name="entry.PRICE_ID" class="input" placeholder="e.g., Free, $50, $5/mo" />
+          </div>
         </div>
 
         <div id="statusContribute" style="display:none; margin-bottom: 20px;"></div>
@@ -121,7 +144,6 @@
       }
     }
 
-    // Google Form Submission Handler
     function submitToGoogle(e, type) {
       e.preventDefault();
       
@@ -130,10 +152,7 @@
       const status = type === 'message' ? document.getElementById('statusMessage') : document.getElementById('statusContribute');
       const originalText = btn.innerHTML;
 
-      // =========================================================================
-      // IMPORTANT: YOU MUST REPLACE THIS URL WITH YOUR SPECIFIC FORM RESPONSE URL
-      // =========================================================================
-      // It should look like: https://docs.google.com/forms/d/e/YOUR_LONG_ID/formResponse
+      // I have added your specific Form URL here!
       const googleFormURL = 'https://docs.google.com/forms/d/e/1FAIpQLScgdIClR6Oq7k_AHF0K84ZzQQ-tEqF2HvL_G7kw7iKc-W78CA/formResponse';
 
       btn.disabled = true;
@@ -142,7 +161,6 @@
 
       const formData = new FormData(form);
 
-      // Send to Google silently
       fetch(googleFormURL, {
         method: 'POST',
         mode: 'no-cors',
@@ -159,13 +177,11 @@
         } else {
           status.innerHTML = `<div class="status-dot"></div>Tool details sent! Opening your email to attach the video...`;
           
-          // Trigger Email App for the Video
           const tName = document.getElementById('toolName').value;
           const dName = document.getElementById('devName').value;
           const subject = encodeURIComponent(`Tool Submission Video: ${tName} by ${dName}`);
           const body = encodeURIComponent(`Hi PALMTOOLS team,\n\nI just submitted the form for my tool "${tName}". \n\nPlease find my screen recording attached below!\n\nThanks,\n${dName}`);
           
-          // Opens user's default email client
           window.location.href = `mailto:palmtools@gmail.com?subject=${subject}&body=${body}`;
         }
         
